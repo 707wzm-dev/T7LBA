@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Teleprompter Pro 1-100</title>
+<title>Teleprompter Tiempo Real</title>
 <style>
   body { margin: 0; background: black; color: white; font-family: Arial, sans-serif; overflow: hidden; }
   
@@ -25,7 +25,6 @@
 
   .mirror { transform: scaleX(-1); }
 
-  /* Guía visual verde */
   #line-guide {
     position: fixed; top: 50%; left: 0; width: 100%; height: 2px;
     background: rgba(0, 255, 0, 0.4); pointer-events: none; z-index: 10;
@@ -40,7 +39,7 @@
 
   .config-group {
     display: flex; align-items: center; gap: 5px; background: #222;
-    padding: 5px 10px; border-radius: 5px; border: 1px solid #555;
+    padding: 5px 10px; border-radius: 5px;
   }
 
   input[type="number"] {
@@ -53,8 +52,7 @@
     border-radius: 5px; cursor: pointer; font-size: 13px; min-width: 40px;
   }
 
-  .active { background: #d32f2f !important; box-shadow: 0 0 8px red; }
-  label { font-size: 11px; color: #aaa; }
+  .active { background: #d32f2f !important; box-shadow: 0 0 10px red; }
 </style>
 </head>
 <body>
@@ -63,15 +61,15 @@
 
 <div id="viewport">
   <div id="margin-box">
-    <div id="text" contenteditable="true" spellcheck="false">Pega tu guion aquí. 
-Velocidad sugerida: 15-25. Rango: 1 a 100.
-Si hablas y te quedas atrás, el texto retrocederá automáticamente al centro.</div>
+    <div id="text" contenteditable="true" spellcheck="false">Pega tu guion aquí... 
+Velocidad sugerida: 15-20.
+Ahora el reconocimiento es mucho más rápido y sin ruidos molestos.</div>
   </div>
 </div>
 
 <div id="controls">
   <div class="config-group">
-    <label>VEL (1-100):</label>
+    <label style="font-size: 11px">VEL:</label>
     <input type="number" id="speedInput" value="15" min="1" max="100">
   </div>
   
@@ -96,14 +94,12 @@ const speedInput = document.getElementById("speedInput");
 
 let running = false;
 let scrollPos = 0;
+let recognition;
 
-// MOTOR DE MOVIMIENTO CONSTANTE (Escalado 1-100)
+// MOTOR DE MOVIMIENTO CONSTANTE
 function scrollLoop() {
   if (running) {
-    // Dividimos por 20 para que el rango 1-100 sea manejable en píxeles por frame
-    let userSpeed = parseFloat(speedInput.value) || 0;
-    let actualSpeed = userSpeed / 20; 
-    
+    let actualSpeed = (parseFloat(speedInput.value) || 0) / 20; 
     scrollPos += actualSpeed;
     viewport.scrollTop = scrollPos;
   }
@@ -111,32 +107,31 @@ function scrollLoop() {
 }
 scrollLoop();
 
-// RECONOCIMIENTO DE VOZ PARA RETROCESO
+// RECONOCIMIENTO DE VOZ OPTIMIZADO
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition;
 
 if (SR) {
   recognition = new SR();
   recognition.lang = 'es-ES';
   recognition.continuous = true;
-  recognition.interimResults = true;
+  recognition.interimResults = true; // CLAVE: Resultados en tiempo real
 
   recognition.onresult = (event) => {
-    let transcript = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
+    // Tomamos solo el resultado más reciente para procesar rápido
+    const result = event.results[event.results.length - 1];
+    if (result.isFinal || result[0].confidence > 0.1) {
+      const palabraEscuchada = result[0].transcript.trim().split(" ").pop().toLowerCase();
+      reubicarRapido(palabraEscuchada);
     }
-    reubicarPorVoz(transcript.toLowerCase().trim());
   };
 
+  // Reinicio silencioso
   recognition.onend = () => { if (running) recognition.start(); };
 }
 
-function reubicarPorVoz(voz) {
-  const palabras = voz.split(" ");
-  const ultima = palabras[palabras.length - 1];
+function reubicarRapido(ultimaPalabra) {
   const contenido = textElem.innerText.toLowerCase();
-  const index = contenido.lastIndexOf(ultima);
+  const index = contenido.lastIndexOf(ultimaPalabra);
 
   if (index !== -1) {
     const range = document.createRange();
@@ -148,13 +143,13 @@ function reubicarPorVoz(voz) {
       if (index >= count && index < nextCount) {
         try {
           range.setStart(node, index - count);
-          range.setEnd(node, index - count + ultima.length);
+          range.setEnd(node, index - count + ultimaPalabra.length);
           const rect = range.getBoundingClientRect();
-          
           const centroPantalla = window.innerHeight / 2;
           
-          // Si la palabra está POR ARRIBA del centro (te quedaste atrás), el scroll regresa
-          if (rect.top < centroPantalla - 30) {
+          // Solo retrocedemos si la palabra está al menos 40px por encima del centro
+          // Esto evita que el texto vibre por cada palabra
+          if (rect.top < centroPantalla - 40) {
             const ajuste = viewport.scrollTop + rect.top - centroPantalla;
             scrollPos = ajuste; 
             viewport.scrollTo({ top: ajuste, behavior: 'smooth' });
@@ -184,15 +179,12 @@ micBtn.onclick = () => {
   }
 };
 
-// --- CONTROLES DE INTERFAZ ---
+// CONTROLES
 document.getElementById("mirrorBtn").onclick = () => textElem.classList.toggle("mirror");
 document.getElementById("plusBtn").onclick = () => { textElem.style.fontSize = (parseInt(window.getComputedStyle(textElem).fontSize) + 4) + "px"; };
 document.getElementById("minusBtn").onclick = () => { textElem.style.fontSize = (parseInt(window.getComputedStyle(textElem).fontSize) - 4) + "px"; };
-
-let mWidth = 80;
-document.getElementById("mPlus").onclick = () => { mWidth = Math.min(100, mWidth + 5); marginBox.style.width = mWidth + "%"; };
-document.getElementById("mMinus").onclick = () => { mWidth = Math.max(20, mWidth - 5); marginBox.style.width = mWidth + "%"; };
-
+document.getElementById("mPlus").onclick = () => { marginBox.style.width = Math.min(100, (marginBox.offsetWidth / window.innerWidth * 100) + 5) + "%"; };
+document.getElementById("mMinus").onclick = () => { marginBox.style.width = Math.max(20, (marginBox.offsetWidth / window.innerWidth * 100) - 5) + "%"; };
 document.getElementById("leftBtn").onclick = () => textElem.style.textAlign = "left";
 document.getElementById("centerBtn").onclick = () => textElem.style.textAlign = "center";
 document.getElementById("rightBtn").onclick = () => textElem.style.textAlign = "right";
