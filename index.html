@@ -3,53 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Teleprompter Tiempo Real</title>
+<title>Teleprompter a mi Ritmo</title>
 <style>
   body { margin: 0; background: black; color: white; font-family: Arial, sans-serif; overflow: hidden; }
   
   #viewport {
-    height: 100vh; overflow-y: scroll; scroll-behavior: smooth;
+    height: 100vh; overflow-y: hidden;
     display: flex; flex-direction: column; align-items: center;
+    scroll-behavior: smooth;
   }
-  #viewport::-webkit-scrollbar { display: none; }
 
   #margin-box {
-    width: 80%; padding-top: 45vh; padding-bottom: 90vh;
+    width: 80%; padding-top: 50vh; padding-bottom: 80vh;
     transition: width 0.3s;
   }
 
   #text {
-    width: 100%; font-size: 40px; line-height: 1.6;
+    width: 100%; font-size: 45px; line-height: 1.7;
     outline: none; white-space: pre-wrap; word-wrap: break-word;
+    color: #888; /* Texto base en gris */
   }
 
   .mirror { transform: scaleX(-1); }
 
-  #line-guide {
+  /* Indicador de lectura */
+  #guide {
     position: fixed; top: 50%; left: 0; width: 100%; height: 2px;
-    background: rgba(0, 255, 0, 0.4); pointer-events: none; z-index: 10;
+    background: #0f0; opacity: 0.5; pointer-events: none; z-index: 10;
   }
 
   #controls {
     position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
     display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
-    background: rgba(20, 20, 20, 0.95); padding: 12px; border-radius: 12px; z-index: 100;
-    width: 95%; max-width: 650px; border: 1px solid #444;
-  }
-
-  .config-group {
-    display: flex; align-items: center; gap: 5px; background: #222;
-    padding: 5px 10px; border-radius: 5px;
-  }
-
-  input[type="number"] {
-    width: 55px; background: #000; color: #0f0; border: 1px solid #0f0;
-    padding: 5px; text-align: center; border-radius: 3px; font-weight: bold; font-size: 16px;
+    background: rgba(20, 20, 20, 0.9); padding: 12px; border-radius: 12px; z-index: 100;
   }
 
   button {
-    background: #444; color: white; border: none; padding: 10px;
-    border-radius: 5px; cursor: pointer; font-size: 13px; min-width: 40px;
+    background: #333; color: white; border: none; padding: 10px 15px;
+    border-radius: 6px; cursor: pointer; font-size: 14px;
   }
 
   .active { background: #d32f2f !important; box-shadow: 0 0 10px red; }
@@ -57,31 +48,23 @@
 </head>
 <body>
 
-<div id="line-guide"></div>
+<div id="guide"></div>
 
 <div id="viewport">
   <div id="margin-box">
-    <div id="text" contenteditable="true" spellcheck="false">Pega tu guion aquí... 
-Velocidad sugerida: 15-20.
-Ahora el reconocimiento es mucho más rápido y sin ruidos molestos.</div>
+    <div id="text" contenteditable="true" spellcheck="false">Pega tu guion aquí. 
+Al activar la voz, el texto solo se moverá cuando tú hables. 
+Si vas rápido, sube rápido. Si te callas, se detiene.</div>
   </div>
 </div>
 
 <div id="controls">
-  <div class="config-group">
-    <label style="font-size: 11px">VEL:</label>
-    <input type="number" id="speedInput" value="15" min="1" max="100">
-  </div>
-  
-  <button id="micBtn">🎙️ Voz Off</button>
+  <button id="micBtn">🎙️ Iniciar Ritmo</button>
   <button id="mirrorBtn">🪞 Espejo</button>
   <button id="plusBtn">A+</button>
   <button id="minusBtn">A-</button>
   <button id="mPlus">↔️+</button>
   <button id="mMinus">↔️-</button>
-  <button id="leftBtn">⬅️</button>
-  <button id="centerBtn">⬆️</button>
-  <button id="rightBtn">➡️</button>
   <button id="resetBtn">🔄</button>
 </div>
 
@@ -90,50 +73,41 @@ const viewport = document.getElementById("viewport");
 const textElem = document.getElementById("text");
 const marginBox = document.getElementById("margin-box");
 const micBtn = document.getElementById("micBtn");
-const speedInput = document.getElementById("speedInput");
 
-let running = false;
-let scrollPos = 0;
+let isListening = false;
 let recognition;
+let lastIndex = 0;
 
-// MOTOR DE MOVIMIENTO CONSTANTE
-function scrollLoop() {
-  if (running) {
-    let actualSpeed = (parseFloat(speedInput.value) || 0) / 20; 
-    scrollPos += actualSpeed;
-    viewport.scrollTop = scrollPos;
-  }
-  requestAnimationFrame(scrollLoop);
-}
-scrollLoop();
-
-// RECONOCIMIENTO DE VOZ OPTIMIZADO
+// CONFIGURACIÓN DE VOZ
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 if (SR) {
   recognition = new SR();
   recognition.lang = 'es-ES';
   recognition.continuous = true;
-  recognition.interimResults = true; // CLAVE: Resultados en tiempo real
+  recognition.interimResults = true;
 
   recognition.onresult = (event) => {
-    // Tomamos solo el resultado más reciente para procesar rápido
-    const result = event.results[event.results.length - 1];
-    if (result.isFinal || result[0].confidence > 0.1) {
-      const palabraEscuchada = result[0].transcript.trim().split(" ").pop().toLowerCase();
-      reubicarRapido(palabraEscuchada);
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
     }
+    empujarTexto(transcript.toLowerCase().trim());
   };
 
-  // Reinicio silencioso
-  recognition.onend = () => { if (running) recognition.start(); };
+  recognition.onend = () => { if (isListening) recognition.start(); };
 }
 
-function reubicarRapido(ultimaPalabra) {
+function empujarTexto(voz) {
+  const palabras = voz.split(" ");
+  const ultima = palabras[palabras.length - 1];
   const contenido = textElem.innerText.toLowerCase();
-  const index = contenido.lastIndexOf(ultimaPalabra);
+  
+  // Buscamos la palabra a partir de la última posición conocida para no saltar atrás
+  const index = contenido.indexOf(ultima, lastIndex);
 
   if (index !== -1) {
+    lastIndex = index; // Actualizamos marcador de progreso
     const range = document.createRange();
     const walker = document.createTreeWalker(textElem, NodeFilter.SHOW_TEXT, null, false);
     let node, count = 0;
@@ -143,17 +117,13 @@ function reubicarRapido(ultimaPalabra) {
       if (index >= count && index < nextCount) {
         try {
           range.setStart(node, index - count);
-          range.setEnd(node, index - count + ultimaPalabra.length);
+          range.setEnd(node, index - count + ultima.length);
           const rect = range.getBoundingClientRect();
-          const centroPantalla = window.innerHeight / 2;
           
-          // Solo retrocedemos si la palabra está al menos 40px por encima del centro
-          // Esto evita que el texto vibre por cada palabra
-          if (rect.top < centroPantalla - 40) {
-            const ajuste = viewport.scrollTop + rect.top - centroPantalla;
-            scrollPos = ajuste; 
-            viewport.scrollTo({ top: ajuste, behavior: 'smooth' });
-          }
+          // Movemos el viewport para que la palabra detectada quede al centro
+          const distAlCentro = rect.top - (window.innerHeight / 2);
+          viewport.scrollTop += distAlCentro;
+          
         } catch(e) {}
         break;
       }
@@ -163,32 +133,30 @@ function reubicarRapido(ultimaPalabra) {
 }
 
 micBtn.onclick = () => {
-  if (!running) {
-    running = true;
-    scrollPos = viewport.scrollTop;
+  if (!isListening) {
+    isListening = true;
+    lastIndex = 0;
     micBtn.classList.add("active");
-    micBtn.innerText = "🎙️ Voz ON";
+    micBtn.innerText = "🛑 Detener";
+    textElem.style.color = "white"; // Resaltar texto al empezar
     textElem.contentEditable = "false";
-    if (recognition) recognition.start();
+    recognition.start();
   } else {
-    running = false;
+    isListening = false;
     micBtn.classList.remove("active");
-    micBtn.innerText = "🎙️ Voz OFF";
+    micBtn.innerText = "🎙️ Iniciar Ritmo";
     textElem.contentEditable = "true";
-    if (recognition) recognition.stop();
+    recognition.stop();
   }
 };
 
-// CONTROLES
+// CONTROLES BÁSICOS
 document.getElementById("mirrorBtn").onclick = () => textElem.classList.toggle("mirror");
 document.getElementById("plusBtn").onclick = () => { textElem.style.fontSize = (parseInt(window.getComputedStyle(textElem).fontSize) + 4) + "px"; };
 document.getElementById("minusBtn").onclick = () => { textElem.style.fontSize = (parseInt(window.getComputedStyle(textElem).fontSize) - 4) + "px"; };
 document.getElementById("mPlus").onclick = () => { marginBox.style.width = Math.min(100, (marginBox.offsetWidth / window.innerWidth * 100) + 5) + "%"; };
 document.getElementById("mMinus").onclick = () => { marginBox.style.width = Math.max(20, (marginBox.offsetWidth / window.innerWidth * 100) - 5) + "%"; };
-document.getElementById("leftBtn").onclick = () => textElem.style.textAlign = "left";
-document.getElementById("centerBtn").onclick = () => textElem.style.textAlign = "center";
-document.getElementById("rightBtn").onclick = () => textElem.style.textAlign = "right";
-document.getElementById("resetBtn").onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
+document.getElementById("resetBtn").onclick = () => { viewport.scrollTop = 0; lastIndex = 0; };
 </script>
 </body>
 </html>
