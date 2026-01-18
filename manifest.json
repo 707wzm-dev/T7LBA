@@ -1,6 +1,7 @@
 {
-  "name": "Teleprompter Pro",
+  "name": "Teleprompter Studio Pro",
   "short_name": "Prompter",
+  "description": "Teleprompter profesional con sensor de voz",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#000000",
@@ -10,7 +11,8 @@
     {
       "src": "https://cdn-icons-png.flaticon.com/512/2581/2581624.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
