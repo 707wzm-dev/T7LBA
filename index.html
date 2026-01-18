@@ -3,30 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Teleprompter Pro Audio</title>
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#000000">
+    <title>Teleprompter Sensor Pro</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
         
-        /* Contenedor de texto */
         #viewport {
-            height: 100vh; overflow-y: scroll; 
+            height: 100vh; overflow-y: auto; 
             display: flex; flex-direction: column; align-items: center;
+            scroll-behavior: auto; /* Desactivamos smooth para respuesta instantánea */
         }
         #viewport::-webkit-scrollbar { display: none; }
 
         #margin-box { width: 85%; padding-top: 45vh; padding-bottom: 80vh; }
-        
-        #text { 
-            width: 100%; font-size: 42px; line-height: 1.6; 
-            outline: none; white-space: pre-wrap; 
-        }
+        #text { width: 100%; font-size: 45px; line-height: 1.6; outline: none; white-space: pre-wrap; }
 
-        /* Indicador de nivel de voz */
-        #audio-bar {
-            position: fixed; top: 0; left: 0; height: 5px; 
-            background: #0f0; width: 0%; transition: width 0.1s; z-index: 100;
+        /* Monitor de Audio */
+        #audio-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 10px; 
+            background: #222; z-index: 1000;
+        }
+        #audio-bar { height: 100%; background: #0f0; width: 0%; transition: width 0.05s; }
+        #threshold-line {
+            position: absolute; top: 0; height: 100%; width: 2px; 
+            background: red; z-index: 1001;
         }
 
         #guide {
@@ -34,124 +33,127 @@
             background: rgba(0, 255, 0, 0.3); pointer-events: none;
         }
 
-        /* Controles */
         #controls {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
-            background: rgba(20, 20, 20, 0.9); padding: 15px; border-radius: 20px;
-            width: 90%; max-width: 450px; border: 1px solid #333;
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+            background: rgba(20, 20, 20, 0.95); padding: 15px; border-radius: 20px;
+            width: 90%; max-width: 450px; border: 1px solid #444;
         }
 
-        button { 
-            background: #333; color: white; border: none; padding: 15px 5px; 
-            border-radius: 12px; font-size: 14px; font-weight: bold;
-        }
-
+        button { background: #444; color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; }
         .active { background: #d32f2f !important; }
         
-        .config-item {
-            grid-column: span 2; display: flex; flex-direction: column; 
-            align-items: center; font-size: 10px; color: #888;
-        }
-
-        input[type="range"] { width: 90%; }
+        .slider-box { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #aaa; text-align: center; }
+        input[type="range"] { width: 100%; }
     </style>
 </head>
 <body>
 
-<div id="audio-bar"></div>
+<div id="audio-container">
+    <div id="audio-bar"></div>
+    <div id="threshold-line"></div>
+</div>
 <div id="guide"></div>
 
 <div id="viewport">
     <div id="margin-box">
-        <div id="text" contenteditable="true" spellcheck="false">Pega tu guion aquí. 
-El texto avanzará automáticamente mientras detecte el sonido de tu voz.
-Ajusta la "Sensibilidad" si hay mucho ruido de fondo.</div>
+        <div id="text" contenteditable="true" spellcheck="false">¡PRUEBA DE VOZ! 
+1. Sube la VELOCIDAD a la mitad.
+2. Baja la SENSIBILIDAD hasta que la barra verde supere la línea roja cuando hables.
+3. El texto DEBE moverse mientras hables.</div>
     </div>
 </div>
 
 <div id="controls">
-    <button id="startBtn" style="grid-column: span 2;">🎙️ INICIAR VOZ</button>
-    <button id="mirrorBtn">🪞</button>
-    <button id="resetBtn">🔄</button>
-
-    <div class="config-item">
+    <button id="startBtn" style="grid-column: span 2;">🎙️ ACTIVAR SENSOR</button>
+    
+    <div class="slider-box">
         <label>VELOCIDAD</label>
-        <input type="range" id="speedRange" min="1" max="50" value="15">
+        <input type="range" id="speedRange" min="5" max="100" value="25">
     </div>
-    <div class="config-item">
-        <label>SENSIBILIDAD</label>
-        <input type="range" id="sensRange" min="1" max="100" value="20">
+    
+    <div class="slider-box">
+        <label>SENSIBILIDAD (Línea Roja)</label>
+        <input type="range" id="sensRange" min="1" max="100" value="15">
     </div>
+
+    <button id="mirrorBtn">🪞 ESPEJO</button>
+    <button id="resetBtn">🔄 RESET</button>
 </div>
 
 <script>
     const viewport = document.getElementById('viewport');
     const textElem = document.getElementById('text');
     const audioBar = document.getElementById('audio-bar');
+    const thresholdLine = document.getElementById('threshold-line');
     const speedRange = document.getElementById('speedRange');
     const sensRange = document.getElementById('sensRange');
     const startBtn = document.getElementById('startBtn');
 
-    let audioContext, analyser, dataArray, source;
+    let audioContext, analyser, dataArray;
     let isRunning = false;
     let scrollPos = 0;
 
-    // MOTOR DE ANIMACIÓN
-    function update() {
+    // Actualizar posición de la línea roja visualmente
+    sensRange.oninput = () => {
+        thresholdLine.style.left = sensRange.value + "%";
+    };
+    thresholdLine.style.left = sensRange.value + "%";
+
+    function mainLoop() {
         if (isRunning && analyser) {
             analyser.getByteFrequencyData(dataArray);
             
-            // Calculamos el volumen promedio
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-            let volume = sum / dataArray.length;
+            // Calculamos volumen
+            let values = 0;
+            for (let i = 0; i < dataArray.length; i++) values += dataArray[i];
+            let volume = (values / dataArray.length) * 1.5; // Amplificamos escala
 
-            // Mostrar nivel en la barra superior
-            audioBar.style.width = volume + "%";
+            audioBar.style.width = Math.min(volume, 100) + "%";
 
-            // SI EL VOLUMEN SUPERA LA SENSIBILIDAD, EL TEXTO SUBE
-            if (volume > sensRange.value) {
-                let speed = parseFloat(speedRange.value) / 10;
-                scrollPos += speed;
-                viewport.scrollTop = scrollPos;
+            // SI EL VOLUMEN SUPERA EL UMBRAL
+            if (volume > parseInt(sensRange.value)) {
+                // Multiplicamos por un factor para que el rango 5-100 sea útil
+                let moveAmount = parseFloat(speedRange.value) / 15;
+                scrollPos += moveAmount;
+                viewport.scrollTop = Math.floor(scrollPos);
             }
         }
-        requestAnimationFrame(update);
+        requestAnimationFrame(mainLoop);
     }
-    update();
+    mainLoop();
 
-    // INICIAR MICRÓFONO NATIVO
-    async function initAudio() {
+    async function startMic() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
-            source = audioContext.createMediaStreamSource(stream);
+            const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
             analyser.fftSize = 256;
             dataArray = new Uint8Array(analyser.frequencyBinCount);
             return true;
         } catch (err) {
-            alert("Error al acceder al micrófono: " + err);
+            alert("No se pudo acceder al micro. Revisa permisos.");
             return false;
         }
     }
 
     startBtn.onclick = async () => {
         if (!isRunning) {
-            if (!audioContext) await initAudio();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            
-            isRunning = true;
-            scrollPos = viewport.scrollTop;
-            startBtn.classList.add('active');
-            startBtn.innerText = "🛑 DETENER";
-            textElem.contentEditable = "false";
+            const ok = await startMic();
+            if (ok) {
+                if (audioContext.state === 'suspended') await audioContext.resume();
+                isRunning = true;
+                scrollPos = viewport.scrollTop;
+                startBtn.classList.add('active');
+                startBtn.innerText = "🛑 SENSOR ACTIVO";
+                textElem.contentEditable = "false";
+            }
         } else {
             isRunning = false;
             startBtn.classList.remove('active');
-            startBtn.innerText = "🎙️ INICIAR VOZ";
+            startBtn.innerText = "🎙️ ACTIVAR SENSOR";
             textElem.contentEditable = "true";
         }
     };
