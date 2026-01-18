@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teleprompter Voz Android</title>
+
+<style>
+body {
+  margin: 0;
+  background: black;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+#viewport {
+  height: 100vh;
+  overflow-y: auto;
+}
+
+#text {
+  padding: 40px;
+  font-size: 38px;
+  line-height: 1.4;
+  max-width: 90%;
+  margin: auto;
+}
+
+.mirror {
+  transform: scaleX(-1);
+}
+
+#controls {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: rgba(0,0,0,0.75);
+  padding: 8px;
+  border-radius: 10px;
+  z-index: 10;
+}
+
+button {
+  font-size: 14px;
+  padding: 6px 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="viewport">
+  <div id="text" contenteditable="true">
+Pega aquí tu texto del teleprompter.
+
+Pulsa 🎙️ una vez para activar el micrófono.
+Lee y el texto avanzará solo.
+  </div>
+</div>
+
+<div id="controls">
+  <button id="micBtn">🎙️ Mic</button>
+  <button id="mirrorBtn">🪞 Mirror</button>
+  <button id="plusBtn">A+</button>
+  <button id="minusBtn">A-</button>
+  <button id="marginPlus">➕ Margen</button>
+  <button id="marginMinus">➖ Margen</button>
+  <button id="leftBtn">⬅️</button>
+  <button id="centerBtn">⬆️</button>
+  <button id="rightBtn">➡️</button>
+</div>
+
+<script>
+const viewport = document.getElementById("viewport");
+const text = document.getElementById("text");
+
+const micBtn = document.getElementById("micBtn");
+const mirrorBtn = document.getElementById("mirrorBtn");
+const plusBtn = document.getElementById("plusBtn");
+const minusBtn = document.getElementById("minusBtn");
+const marginPlus = document.getElementById("marginPlus");
+const marginMinus = document.getElementById("marginMinus");
+const leftBtn = document.getElementById("leftBtn");
+const centerBtn = document.getElementById("centerBtn");
+const rightBtn = document.getElementById("rightBtn");
+
+let recognition = null;
+let listening = false;
+let font = 38;
+let width = 90;
+let mirrored = false;
+
+/* MICRÓFONO */
+micBtn.addEventListener("click", () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    alert("Este navegador no soporta reconocimiento de voz");
+    return;
+  }
+
+  if (!listening) {
+    recognition = new SR();
+    recognition.lang = "es-ES";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onresult = () => {
+      viewport.scrollTop += 14;
+    };
+
+    recognition.onend = () => {
+      if (listening) recognition.start();
+    };
+
+    recognition.start();
+    listening = true;
+    micBtn.style.background = "green";
+  } else {
+    listening = false;
+    recognition.stop();
+    micBtn.style.background = "";
+  }
+});
+
+/* ESPEJO */
+mirrorBtn.addEventListener("click", () => {
+  mirrored = !mirrored;
+  viewport.classList.toggle("mirror", mirrored);
+});
+
+/* TEXTO */
+plusBtn.addEventListener("click", () => {
+  font += 2;
+  text.style.fontSize = font + "px";
+});
+
+minusBtn.addEventListener("click", () => {
+  font -= 2;
+  if (font < 16) font = 16;
+  text.style.fontSize = font + "px";
+});
+
+/* MÁRGENES */
+marginPlus.addEventListener("click", () => {
+  width += 5;
+  if (width > 100) width = 100;
+  text.style.maxWidth = width + "%";
+});
+
+marginMinus.addEventListener("click", () => {
+  width -= 5;
+  if (width < 40) width = 40;
+  text.style.maxWidth = width + "%";
+});
+
+/* ALINEACIÓN */
+leftBtn.addEventListener("click", () => text.style.textAlign = "left");
+centerBtn.addEventListener("click", () => text.style.textAlign = "center");
+rightBtn.addEventListener("click", () => text.style.textAlign = "right");
+</script>
+
+</body>
+</html>
