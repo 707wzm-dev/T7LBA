@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Teleprompter Voz Pro - Estable</title>
+<title>Teleprompter Fluido Pro</title>
 <style>
   body {
     margin: 0; background: black; color: white;
@@ -12,17 +12,15 @@
 
   #viewport {
     height: 100vh;
-    overflow-y: auto;
-    scroll-behavior: smooth;
+    overflow: hidden;
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
 
-  #viewport::-webkit-scrollbar { display: none; }
-
   #margin-box {
-    width: 90%;
+    width: 85%;
     padding-top: 50vh;
     padding-bottom: 80vh;
     transition: width 0.3s ease;
@@ -30,46 +28,47 @@
 
   #text {
     width: 100%;
-    font-size: 40px;
+    font-size: 42px;
     line-height: 1.6;
     outline: none;
     white-space: pre-wrap;
     word-wrap: break-word;
-    min-height: 200px;
   }
 
   .mirror { transform: scaleX(-1); }
 
+  #guide {
+    position: fixed; top: 50%; left: 0; width: 100%; height: 60px;
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateY(-50%);
+    pointer-events: none; border-top: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    z-index: 5;
+  }
+
   #controls {
     position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
     display: flex; flex-wrap: wrap; justify-content: center;
-    gap: 8px; background: rgba(25,25,25,0.95);
-    padding: 12px; border-radius: 15px; z-index: 100; width: 92%; max-width: 550px;
-    border: 1px solid #444;
+    gap: 6px; background: rgba(20, 20, 20, 0.95);
+    padding: 10px; border-radius: 12px; z-index: 100; width: 95%; max-width: 550px;
   }
 
   button {
     font-size: 14px; padding: 10px; cursor: pointer;
     background: #333; color: white; border: none; border-radius: 6px;
-    flex-grow: 1; min-width: 45px;
+    flex: 1; min-width: 40px;
   }
 
-  .active-mic { background: #d32f2f !important; }
-  
-  /* Indicador visual del centro */
-  #center-line {
-    position: fixed; top: 50%; left: 0; width: 100%; height: 2px;
-    background: rgba(255, 255, 255, 0.15); pointer-events: none; z-index: 50;
-  }
+  .active-mic { background: #d32f2f !important; box-shadow: 0 0 10px red; }
 </style>
 </head>
 <body>
 
-<div id="center-line"></div>
+<div id="guide"></div>
 
 <div id="viewport">
   <div id="margin-box">
-    <div id="text" contenteditable="true" spellcheck="false">Pega tu texto aquí y pulsa Voz para comenzar...</div>
+    <div id="text" contenteditable="true" spellcheck="false">Pega tu guion aquí... Pulsa Voz y lee con naturalidad. El micrófono se mantendrá siempre activo ahora.</div>
   </div>
 </div>
 
@@ -93,9 +92,30 @@ const marginBox = document.getElementById("margin-box");
 const micBtn = document.getElementById("micBtn");
 
 let isListening = false;
-let maxScrollReached = 0; // Para evitar que el texto retroceda
+let currentScroll = 0;
+let targetScroll = 0;
 let recognition;
 
+// MOTOR DE ANIMACIÓN ULTRA FLUIDO
+function updateScroll() {
+  if (isListening) {
+    let diff = targetScroll - currentScroll;
+    
+    // Si detectamos que la voz va adelante, nos movemos suavemente
+    if (diff > 0) {
+      currentScroll += diff * 0.04; // Factor de suavizado
+    }
+    
+    // Movimiento de inercia mínimo para evitar que el texto se sienta "pegado"
+    currentScroll += 0.15; 
+    
+    viewport.scrollTop = currentScroll;
+  }
+  requestAnimationFrame(updateScroll);
+}
+updateScroll();
+
+// CONFIGURACIÓN DEL MICRÓFONO
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 if (SpeechRecognition) {
@@ -109,18 +129,30 @@ if (SpeechRecognition) {
     for (let i = event.resultIndex; i < event.results.length; i++) {
       transcript += event.results[i][0].transcript;
     }
-    controlarScroll(transcript.toLowerCase().trim());
+    // Procesamos solo la última parte escuchada para mayor rapidez
+    sincronizar(transcript.toLowerCase().trim());
   };
 
-  recognition.onend = () => { if (isListening) recognition.start(); };
+  // REINICIO AUTOMÁTICO CRUCIAL
+  recognition.onend = () => {
+    if (isListening) {
+      console.log("Reiniciando micrófono para mantener continuidad...");
+      recognition.start();
+    }
+  };
+
+  recognition.onerror = (event) => {
+    console.error("Error de reconocimiento:", event.error);
+    if (event.error === 'network') alert("Revisa tu conexión a internet");
+  };
 }
 
-function controlarScroll(voz) {
+function sincronizar(voz) {
   const palabras = voz.split(" ");
   const ultima = palabras[palabras.length - 1];
   const contenido = textElem.innerText.toLowerCase();
   
-  // Buscamos la palabra, pero priorizamos las que aparecen después de lo que ya leímos
+  // Buscamos la palabra más reciente
   const index = contenido.lastIndexOf(ultima);
 
   if (index !== -1) {
@@ -136,13 +168,11 @@ function controlarScroll(voz) {
           range.setEnd(node, index - charCount + ultima.length);
           const rect = range.getBoundingClientRect();
           
-          // Calculamos el punto exacto para centrar
-          const currentTarget = viewport.scrollTop + rect.top - (window.innerHeight / 2) + (rect.height / 2);
+          const newTarget = viewport.scrollTop + rect.top - (window.innerHeight / 2);
           
-          // LÓGICA ANTI-RETROCESO: Solo hacemos scroll si el destino es mayor al actual
-          if (currentTarget > maxScrollReached) {
-            maxScrollReached = currentTarget;
-            viewport.scrollTo({ top: currentTarget, behavior: 'smooth' });
+          // Solo actualizamos el objetivo si es hacia adelante (evita rebotes)
+          if (newTarget > targetScroll) {
+            targetScroll = newTarget;
           }
         } catch(e) {}
         break;
@@ -154,8 +184,10 @@ function controlarScroll(voz) {
 
 micBtn.onclick = () => {
   if (!isListening) {
+    if (!SpeechRecognition) return alert("Navegador no compatible.");
     isListening = true;
-    maxScrollReached = viewport.scrollTop; // Empezamos desde donde esté el scroll
+    currentScroll = viewport.scrollTop;
+    targetScroll = currentScroll;
     micBtn.classList.add("active-mic");
     textElem.contentEditable = "false";
     recognition.start();
@@ -167,14 +199,14 @@ micBtn.onclick = () => {
   }
 };
 
-// --- RESTO DE BOTONES ---
+// CONTROLES DE INTERFAZ
 document.getElementById("mirrorBtn").onclick = () => textElem.classList.toggle("mirror");
 
-let fSize = 40;
+let fSize = 42;
 document.getElementById("plusBtn").onclick = () => { fSize += 4; textElem.style.fontSize = fSize + "px"; };
 document.getElementById("minusBtn").onclick = () => { fSize = Math.max(16, fSize - 4); textElem.style.fontSize = fSize + "px"; };
 
-let mWidth = 90;
+let mWidth = 85;
 document.getElementById("marginPlus").onclick = () => { mWidth = Math.min(100, mWidth + 5); marginBox.style.width = mWidth + "%"; };
 document.getElementById("marginMinus").onclick = () => { mWidth = Math.max(20, mWidth - 5); marginBox.style.width = mWidth + "%"; };
 
@@ -183,8 +215,9 @@ document.getElementById("centerBtn").onclick = () => textElem.style.textAlign = 
 document.getElementById("rightBtn").onclick = () => textElem.style.textAlign = "right";
 
 document.getElementById("resetBtn").onclick = () => { 
-  maxScrollReached = 0;
-  viewport.scrollTo({top: 0, behavior: 'smooth'}); 
+  currentScroll = 0;
+  targetScroll = 0;
+  viewport.scrollTop = 0;
 };
 </script>
 </body>
