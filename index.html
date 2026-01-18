@@ -3,25 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Teleprompter Studio Mirror Fixed</title>
+    <title>Teleprompter Studio Pro</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2581/2581624.png">
+
+    <script>
+        // Registro del Service Worker para habilitar la instalación
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('data:application/javascript,self.addEventListener("fetch", function(event){});').catch(err => console.log('SW error', err));
+            });
+        }
+    </script>
+
     <style>
         :root { --panel-bg: rgba(20, 20, 20, 0.98); --accent: #0f0; }
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
         
-        /* Área de Texto */
         #viewport {
             height: 100vh; overflow-y: auto; 
             display: flex; flex-direction: column; align-items: center;
         }
         #viewport::-webkit-scrollbar { display: none; }
         
-        /* Ajuste de Margen y Espejo */
         #margin-box { 
             width: 85%; padding-top: 45vh; padding-bottom: 85vh; 
             transition: width 0.3s ease, transform 0.3s ease; 
         }
         
-        /* CLASE ESPEJO CORREGIDA */
         .mirror-active { 
             transform: scaleX(-1) !important; 
         }
@@ -31,13 +44,11 @@
             outline: none; white-space: pre-wrap; text-align: center;
         }
 
-        /* Guías y Monitores */
         #audio-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #111; z-index: 2000; }
         #audio-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.05s; }
         #threshold-line { position: absolute; top: 0; height: 100%; width: 2px; background: red; z-index: 2001; }
         #guide { position: fixed; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.25); pointer-events: none; }
 
-        /* Botón Ajustes superior derecha */
         #menuToggle {
             position: fixed; top: 20px; right: 20px; width: 50px; height: 50px;
             background: rgba(50, 50, 50, 0.7); border-radius: 50%; display: flex; align-items: center;
@@ -45,7 +56,6 @@
             backdrop-filter: blur(5px); cursor: pointer;
         }
 
-        /* Panel Desplegable */
         #sidePanel {
             position: fixed; bottom: 0; left: 0; width: 100%; height: auto;
             max-height: 75vh; background: var(--panel-bg); z-index: 2500;
@@ -90,9 +100,9 @@
 
 <div id="viewport">
     <div id="margin-box">
-        <div id="text" contenteditable="true" spellcheck="false">¡Modo Espejo Corregido!
-Toca el icono 🪞 en el menú para rotar el texto.
-Esto es útil si usas un cristal físico frente a la cámara.</div>
+        <div id="text" contenteditable="true" spellcheck="false">¡Teleprompter Instalable!
+Toca el icono ⚙️ arriba para configurar.
+Si estás en Chrome (Android), busca "Instalar aplicación" en el menú del navegador.</div>
     </div>
 </div>
 
@@ -142,14 +152,10 @@ Esto es útil si usas un cristal físico frente a la cámara.</div>
 </div>
 
 <script>
-    const viewport = document.getElementById('viewport');
-    const textElem = document.getElementById('text');
-    const marginBox = document.getElementById('margin-box');
-    const audioBar = document.getElementById('audio-bar');
-    const thresholdLine = document.getElementById('threshold-line');
-    const sidePanel = document.getElementById('sidePanel');
-    const menuToggle = document.getElementById('menuToggle');
-    const startBtn = document.getElementById('startBtn');
+    const viewport = document.getElementById('viewport'), textElem = document.getElementById('text'),
+          marginBox = document.getElementById('margin-box'), audioBar = document.getElementById('audio-bar'),
+          thresholdLine = document.getElementById('threshold-line'), sidePanel = document.getElementById('sidePanel'),
+          menuToggle = document.getElementById('menuToggle'), startBtn = document.getElementById('startBtn');
 
     let audioContext, analyser, dataArray, isRunning = false, scrollPos = 0;
     let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1 };
@@ -173,10 +179,7 @@ Esto es útil si usas un cristal físico frente a la cámara.</div>
         textElem.style.textAlign = aligns[config.alignIdx];
     };
 
-    // FUNCIÓN ESPEJO CORREGIDA
-    document.getElementById('mirrorBtn').onclick = () => {
-        marginBox.classList.toggle('mirror-active');
-    };
+    document.getElementById('mirrorBtn').onclick = () => marginBox.classList.toggle('mirror-active');
 
     function mainLoop() {
         if (isRunning && analyser) {
@@ -184,7 +187,6 @@ Esto es útil si usas un cristal físico frente a la cámara.</div>
             let sum = 0; for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
             let volume = (sum / dataArray.length) * 1.5;
             audioBar.style.width = Math.min(volume, 100) + "%";
-
             if (volume > config.sens) {
                 scrollPos += (config.speed / 15);
                 viewport.scrollTop = Math.floor(scrollPos);
