@@ -2,171 +2,195 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Teleprompter Voz Android</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Teleprompter Pro</title>
 
 <style>
-body {
-  margin: 0;
-  background: black;
-  color: white;
-  font-family: Arial, sans-serif;
-  overflow: hidden;
-}
+  body {
+    margin: 0;
+    background: black;
+    color: white;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
 
-#viewport {
-  height: 100vh;
-  overflow: hidden;
-}
+  /* Contenedor principal que permite el scroll */
+  #viewport {
+    height: 100vh;
+    overflow-y: scroll;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
 
-#text {
-  padding: 40px;
-  padding-bottom: 60vh; /* evita que se corte al final */
-  font-size: 38px;
-  line-height: 1.4;
-  max-width: 90%;
-  margin: auto;
-  transform-origin: top;
-}
+  /* Ocultar barra de scroll para estética de teleprompter */
+  #viewport::-webkit-scrollbar {
+    display: none;
+  }
 
-.mirror {
-  transform: scaleX(-1);
-}
+  #text {
+    padding: 60px 40px;
+    padding-bottom: 80vh; 
+    font-size: 38px;
+    line-height: 1.5;
+    max-width: 90%;
+    margin: auto;
+    outline: none;
+    transition: font-size 0.2s, max-width 0.2s;
+  }
 
-#controls {
-  position: fixed;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  background: rgba(0,0,0,0.75);
-  padding: 8px;
-  border-radius: 10px;
-  z-index: 10;
-}
+  /* Modo Espejo */
+  .mirror-mode {
+    transform: scaleX(-1);
+  }
 
-button {
-  font-size: 14px;
-  padding: 6px 10px;
-}
+  #controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(30, 30, 30, 0.9);
+    padding: 12px;
+    border-radius: 15px;
+    z-index: 100;
+    width: 90%;
+    max-width: 500px;
+    border: 1px solid #444;
+  }
+
+  button {
+    font-size: 16px;
+    padding: 10px;
+    cursor: pointer;
+    background: #333;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 8px;
+    min-width: 44px;
+  }
+
+  button:active {
+    background: #555;
+  }
+
+  .active-mic {
+    background: #d32f2f !important;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+  }
 </style>
 </head>
 
 <body>
 
 <div id="viewport">
-  <div id="text" contenteditable="true">
-Pega aquí tu texto del teleprompter.
-
-Pulsa 🎙️ una vez para iniciar.
-Pulsa otra vez para detener.
+  <div id="text" contenteditable="true" spellcheck="false">
+    ¡Bienvenido! Pega tu guion aquí. <br><br>
+    1. Ajusta el tamaño con A+ y A-.<br>
+    2. Usa el botón Espejo si usas un cristal físico.<br>
+    3. Pulsa el Micrófono para iniciar el auto-scroll.
   </div>
 </div>
 
 <div id="controls">
-  <button id="micBtn">🎙️ Mic</button>
-  <button id="mirrorBtn">🪞 Mirror</button>
+  <button id="micBtn" title="Iniciar Voz y Scroll">🎙️</button>
+  <button id="mirrorBtn" title="Modo Espejo">🪞</button>
   <button id="plusBtn">A+</button>
   <button id="minusBtn">A-</button>
-  <button id="marginPlus">➕ Margen</button>
-  <button id="marginMinus">➖ Margen</button>
+  <button id="marginPlus">↔️+</button>
+  <button id="marginMinus">↔️-</button>
   <button id="leftBtn">⬅️</button>
   <button id="centerBtn">⬆️</button>
-  <button id="rightBtn">➡️</button>
+  <button id="speedUp">🚀</button>
+  <button id="speedDown">🐢</button>
 </div>
 
 <script>
 const viewport = document.getElementById("viewport");
 const text = document.getElementById("text");
-
 const micBtn = document.getElementById("micBtn");
-const mirrorBtn = document.getElementById("mirrorBtn");
-const plusBtn = document.getElementById("plusBtn");
-const minusBtn = document.getElementById("minusBtn");
-const marginPlus = document.getElementById("marginPlus");
-const marginMinus = document.getElementById("marginMinus");
-const leftBtn = document.getElementById("leftBtn");
-const centerBtn = document.getElementById("centerBtn");
-const rightBtn = document.getElementById("rightBtn");
 
-let recognition;
 let listening = false;
+let scrollPos = 0;
+let speed = 0.8; // Velocidad base
 
-/* SCROLL SUAVE */
-let scrolling = false;
-let speed = 0.35; // ajusta si quieres más rápido o lento
-
-function smoothScroll() {
-  if (scrolling) {
-    viewport.scrollTop += speed;
+/* MOTOR DE SCROLL */
+function autoScroll() {
+  if (listening) {
+    scrollPos += speed;
+    viewport.scrollTop = scrollPos;
   }
-  requestAnimationFrame(smoothScroll);
+  requestAnimationFrame(autoScroll);
 }
-smoothScroll();
+autoScroll();
 
-/* MICRÓFONO (solo ON / OFF) */
+/* CONTROL DE VOZ */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
 micBtn.onclick = () => {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    alert("Este navegador no soporta reconocimiento de voz");
+    alert("Tu navegador no soporta reconocimiento de voz. El scroll funcionará manualmente.");
+    listening = !listening;
+    actualizarBotonMic();
     return;
   }
 
   if (!listening) {
-    recognition = new SR();
+    const recognition = new SR();
     recognition.lang = "es-ES";
     recognition.continuous = true;
-    recognition.interimResults = false;
+    
+    recognition.onstart = () => {
+      listening = true;
+      scrollPos = viewport.scrollTop; // Sincroniza posición actual
+      actualizarBotonMic();
+    };
 
     recognition.onend = () => {
-      if (listening) recognition.start();
+      if (listening) recognition.start(); // Reinicio automático si se corta
     };
 
     recognition.start();
-    scrolling = true;
-    listening = true;
-    micBtn.style.background = "green";
   } else {
     listening = false;
-    scrolling = false;
-    recognition.stop();
-    micBtn.style.background = "";
+    actualizarBotonMic();
   }
 };
 
+function actualizarBotonMic() {
+  micBtn.classList.toggle("active-mic", listening);
+}
+
 /* ESPEJO */
-mirrorBtn.onclick = () => {
-  viewport.classList.toggle("mirror");
+document.getElementById("mirrorBtn").onclick = () => {
+  text.classList.toggle("mirror-mode");
 };
 
-/* TAMAÑO TEXTO */
-let font = 38;
-plusBtn.onclick = () => {
-  font += 2;
-  text.style.fontSize = font + "px";
-};
-minusBtn.onclick = () => {
-  font = Math.max(16, font - 2);
-  text.style.fontSize = font + "px";
-};
+/* TAMAÑO Y MÁRGENES */
+let fontSize = 38;
+document.getElementById("plusBtn").onclick = () => { fontSize += 4; text.style.fontSize = fontSize + "px"; };
+document.getElementById("minusBtn").onclick = () => { fontSize = Math.max(16, fontSize - 4); text.style.fontSize = fontSize + "px"; };
 
-/* MÁRGENES (FUNCIONAN REALMENTE) */
-let width = 90;
-marginPlus.onclick = () => {
-  width = Math.min(100, width + 5);
-  text.style.maxWidth = width + "%";
-};
-marginMinus.onclick = () => {
-  width = Math.max(40, width - 5);
-  text.style.maxWidth = width + "%";
-};
+let marginW = 90;
+document.getElementById("marginPlus").onclick = () => { marginW = Math.min(100, marginW + 5); text.style.maxWidth = marginW + "%"; };
+document.getElementById("marginMinus").onclick = () => { marginW = Math.max(30, marginW - 5); text.style.maxWidth = marginW + "%"; };
+
+/* VELOCIDAD */
+document.getElementById("speedUp").onclick = () => { speed += 0.2; };
+document.getElementById("speedDown").onclick = () => { speed = Math.max(0.1, speed - 0.2); };
 
 /* ALINEACIÓN */
-leftBtn.onclick = () => text.style.textAlign = "left";
-centerBtn.onclick = () => text.style.textAlign = "center";
-rightBtn.onclick = () => text.style.textAlign = "right";
+document.getElementById("leftBtn").onclick = () => text.style.textAlign = "left";
+document.getElementById("centerBtn").onclick = () => text.style.textAlign = "center";
 </script>
 
 </body>
