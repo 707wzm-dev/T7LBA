@@ -13,7 +13,6 @@
     <link rel="apple-touch-icon" href="Teleprompter7L.png">
 
     <script>
-        // Registro del Service Worker para habilitar la instalación
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('data:application/javascript,self.addEventListener("fetch", function(event){});').catch(err => console.log('SW error', err));
@@ -102,8 +101,7 @@
 <div id="viewport">
     <div id="margin-box">
         <div id="text" contenteditable="true" spellcheck="false">¡Teleprompter Instalable!
-Toca el icono ⚙️ arriba para configurar.
-Si estás en Chrome (Android), busca "Instalar aplicación" en el menú del navegador.</div>
+Toca el icono ⚙️ arriba para configurar.</div>
     </div>
 </div>
 
@@ -159,8 +157,42 @@ Si estás en Chrome (Android), busca "Instalar aplicación" en el menú del nave
           menuToggle = document.getElementById('menuToggle'), startBtn = document.getElementById('startBtn');
 
     let audioContext, analyser, dataArray, isRunning = false, scrollPos = 0;
-    let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1 };
+    let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1, mirror: false };
     const aligns = ['left', 'center', 'right'];
+
+    // --- FUNCIONES DE GUARDADO ---
+    function saveData() {
+        const data = {
+            config: config,
+            text: textElem.innerText
+        };
+        localStorage.setItem('teleprompter_pro_data', JSON.stringify(data));
+    }
+
+    function loadData() {
+        const saved = localStorage.getItem('teleprompter_pro_data');
+        if (saved) {
+            const data = JSON.parse(saved);
+            config = data.config;
+            textElem.innerText = data.text;
+            
+            // Aplicar visualmente los valores cargados
+            document.getElementById('speedVal').innerText = config.speed;
+            document.getElementById('sensVal').innerText = config.sens;
+            document.getElementById('fontSizeVal').innerText = config.fontSize;
+            document.getElementById('marginVal').innerText = config.margin;
+            
+            thresholdLine.style.left = config.sens + "%";
+            textElem.style.fontSize = config.fontSize + "px";
+            marginBox.style.width = config.margin + "%";
+            textElem.style.textAlign = aligns[config.alignIdx];
+            
+            if(config.mirror) marginBox.classList.add('mirror-active');
+        }
+    }
+
+    // Guardar texto automáticamente al escribir
+    textElem.addEventListener('input', saveData);
 
     menuToggle.onclick = () => sidePanel.classList.toggle('open');
 
@@ -173,14 +205,21 @@ Si estás en Chrome (Android), busca "Instalar aplicación" en el menú del nave
         if(type === 'sens') thresholdLine.style.left = config.sens + "%";
         if(type === 'fontSize') textElem.style.fontSize = config.fontSize + "px";
         if(type === 'margin') marginBox.style.width = config.margin + "%";
+        
+        saveData(); // Guardar cada vez que se cambia un ajuste
     }
 
     document.getElementById('alignBtn').onclick = () => {
         config.alignIdx = (config.alignIdx + 1) % 3;
         textElem.style.textAlign = aligns[config.alignIdx];
+        saveData();
     };
 
-    document.getElementById('mirrorBtn').onclick = () => marginBox.classList.toggle('mirror-active');
+    document.getElementById('mirrorBtn').onclick = () => {
+        config.mirror = !config.mirror;
+        marginBox.classList.toggle('mirror-active');
+        saveData();
+    };
 
     function mainLoop() {
         if (isRunning && analyser) {
@@ -224,14 +263,9 @@ Si estás en Chrome (Android), busca "Instalar aplicación" en el menú del nave
     };
 
     document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
+
+    // Cargar datos al iniciar
+    window.onload = loadData;
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
