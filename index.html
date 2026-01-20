@@ -21,97 +21,109 @@
     </script>
 
     <style>
-        :root { --panel-bg: rgba(20, 20, 20, 0.5); --accent: #0f0; }
+        :root { --panel-bg: rgba(20, 20, 20, 0.75); --accent: #0f0; }
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
         
-        #viewport {
-            height: 100vh; overflow-y: auto; 
-            display: flex; flex-direction: column; align-items: center;
-        }
+        #viewport { height: 100vh; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
         #viewport::-webkit-scrollbar { display: none; }
         
-        #margin-box { 
-            width: 85%; padding-top: 45vh; padding-bottom: 85vh; 
-            transition: width 0.3s ease, transform 0.3s ease; 
-        }
-        
-        .mirror-active { 
-            transform: scaleX(-1) !important; 
-        }
+        #margin-box { width: 85%; padding-top: 45vh; padding-bottom: 85vh; transition: width 0.3s ease, transform 0.3s ease; }
+        .mirror-active { transform: scaleX(-1) !important; }
 
-        #text { 
-            width: 100%; font-size: 45px; line-height: 1.6; 
-            outline: none; white-space: pre-wrap; text-align: center;
-        }
+        #text { width: 100%; font-size: 45px; line-height: 1.6; outline: none; white-space: pre-wrap; text-align: center; }
 
         #audio-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #111; z-index: 2000; }
         #audio-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.05s; }
         #threshold-line { position: absolute; top: 0; height: 100%; width: 2px; background: red; z-index: 2001; }
         #guide { position: fixed; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.25); pointer-events: none; }
 
-        #menuToggle {
-            position: fixed; top: 20px; right: 20px; width: 50px; height: 50px;
+        /* Botones Flotantes */
+        .float-btn {
+            position: fixed; top: 20px; width: 50px; height: 50px;
             background: rgba(50, 50, 50, 0.7); border-radius: 50%; display: flex; align-items: center;
             justify-content: center; font-size: 22px; z-index: 3000; border: 1px solid #555;
             backdrop-filter: blur(5px); cursor: pointer;
         }
+        #menuToggle { right: 20px; }
+        #fileToggle { left: 20px; }
 
-        #sidePanel {
+        /* Paneles con el mismo estilo */
+        .side-panel {
             position: fixed; bottom: 0; left: 0; width: 100%; height: auto;
-            max-height: 75vh; background: var(--panel-bg); z-index: 2500;
+            max-height: 80vh; background: var(--panel-bg); z-index: 2500;
             border-top: 1px solid #444; border-radius: 25px 25px 0 0;
             transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             padding: 20px; box-sizing: border-box; overflow-y: auto;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
         }
-        #sidePanel.open { transform: translateY(0); }
+        .side-panel.open { transform: translateY(0); }
+
+        .section-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; text-align: center; display: block; margin-bottom: 15px; }
 
         .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
         .step-control {
             display: flex; flex-direction: column; align-items: center; gap: 6px;
             background: #111; padding: 10px; border-radius: 15px; border: 1px solid #333;
         }
-        .step-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-        .step-buttons { display: flex; align-items: center; gap: 12px; }
+        .step-label { font-size: 10px; color: #888; text-transform: uppercase; }
         .val-display { font-size: 20px; font-weight: bold; color: var(--accent); min-width: 35px; text-align: center; font-family: monospace; }
         
         button.ctrl-btn { background: #333; color: white; border: none; width: 42px; height: 42px; border-radius: 12px; font-size: 20px; cursor: pointer; }
-        button.ctrl-btn:active { transform: scale(0.9); background: #444; }
         
-        #startBtn { 
-            width: 100%; height: 55px; background: #222; color: white; border: 1px solid #444;
-            border-radius: 15px; font-weight: bold; font-size: 16px; margin-bottom: 10px;
-        }
+        #startBtn { width: 100%; height: 55px; background: #222; color: white; border: 1px solid #444; border-radius: 15px; font-weight: bold; font-size: 16px; margin-bottom: 10px; }
         #startBtn.active { background: #d32f2f; border-color: #ff5555; }
         
+        /* Estilos de Biblioteca */
+        .file-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        #noteName { flex: 1; background: #000; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 12px; outline: none; font-size: 16px; }
+        #notesList { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .note-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            background: rgba(255,255,255,0.05); padding: 12px 15px; border-radius: 15px; border: 1px solid #333;
+        }
+        .note-item span { flex: 1; font-size: 15px; }
+        .btn-del { color: #ff5555; background: none; border: none; font-size: 18px; padding-left: 10px; }
+
         .footer-row { display: flex; gap: 10px; margin-top: 12px; }
-        .footer-row button { flex: 1; height: 45px; font-size: 18px; background: #222; border: 1px solid #333; color: white; border-radius: 12px; }
+        .footer-row button { flex: 1; height: 45px; font-size: 16px; background: #222; border: 1px solid #333; color: white; border-radius: 12px; }
     </style>
 </head>
 <body>
 
-<div id="audio-container">
-    <div id="audio-bar"></div>
-    <div id="threshold-line"></div>
-</div>
+<div id="audio-container"><div id="audio-bar"></div><div id="threshold-line"></div></div>
 <div id="guide"></div>
 
-<div id="menuToggle">⚙️</div>
+<div id="fileToggle" class="float-btn">☰</div>
+<div id="menuToggle" class="float-btn">⚙️</div>
 
 <div id="viewport">
     <div id="margin-box">
-        <div id="text" contenteditable="true" spellcheck="false">¡Teleprompter Instalable!
-Toca el icono ⚙️ arriba para configurar.</div>
+        <div id="text" contenteditable="true" spellcheck="false">¡Nuevo Guion! Escribe aquí...</div>
     </div>
 </div>
 
-<div id="sidePanel">
+<div id="filePanel" class="side-panel">
+    <span class="section-label">Gestión de Guiones</span>
+    <div class="file-box">
+        <input id="noteName" type="text" placeholder="Nombre del archivo...">
+        <button class="ctrl-btn" onclick="saveNewNote()" style="width:auto; padding:0 15px;">💾</button>
+    </div>
+    
+    <div id="notesList"></div>
+
+    <div class="footer-row" style="margin-top: 25px; border-top: 1px solid #333; padding-top: 15px;">
+        <button onclick="newFile()">📄 Nuevo Archivo</button>
+    </div>
+</div>
+
+<div id="configPanel" class="side-panel">
+    <span class="section-label">Ajustes de Lectura</span>
     <button id="startBtn">🎙️ ACTIVAR SENSOR POR VOZ</button>
     
     <div class="controls-grid">
         <div class="step-control">
             <span class="step-label">Velocidad</span>
-            <div class="step-buttons">
+            <div style="display:flex; align-items:center; gap:10px;">
                 <button class="ctrl-btn" onclick="changeVal('speed', -1)">-</button>
                 <span id="speedVal" class="val-display">25</span>
                 <button class="ctrl-btn" onclick="changeVal('speed', 1)">+</button>
@@ -119,7 +131,7 @@ Toca el icono ⚙️ arriba para configurar.</div>
         </div>
         <div class="step-control">
             <span class="step-label">Sensibilidad</span>
-            <div class="step-buttons">
+            <div style="display:flex; align-items:center; gap:10px;">
                 <button class="ctrl-btn" onclick="changeVal('sens', -1)">-</button>
                 <span id="sensVal" class="val-display">15</span>
                 <button class="ctrl-btn" onclick="changeVal('sens', 1)">+</button>
@@ -127,7 +139,7 @@ Toca el icono ⚙️ arriba para configurar.</div>
         </div>
         <div class="step-control">
             <span class="step-label">Texto (A)</span>
-            <div class="step-buttons">
+            <div style="display:flex; align-items:center; gap:10px;">
                 <button class="ctrl-btn" onclick="changeVal('fontSize', -2)">-</button>
                 <span id="fontSizeVal" class="val-display">45</span>
                 <button class="ctrl-btn" onclick="changeVal('fontSize', 2)">+</button>
@@ -135,7 +147,7 @@ Toca el icono ⚙️ arriba para configurar.</div>
         </div>
         <div class="step-control">
             <span class="step-label">Márgenes</span>
-            <div class="step-buttons">
+            <div style="display:flex; align-items:center; gap:10px;">
                 <button class="ctrl-btn" onclick="changeVal('margin', -5)">-</button>
                 <span id="marginVal" class="val-display">85</span>
                 <button class="ctrl-btn" onclick="changeVal('margin', 5)">+</button>
@@ -153,99 +165,130 @@ Toca el icono ⚙️ arriba para configurar.</div>
 <script>
     const viewport = document.getElementById('viewport'), textElem = document.getElementById('text'),
           marginBox = document.getElementById('margin-box'), audioBar = document.getElementById('audio-bar'),
-          thresholdLine = document.getElementById('threshold-line'), sidePanel = document.getElementById('sidePanel'),
-          menuToggle = document.getElementById('menuToggle'), startBtn = document.getElementById('startBtn');
+          thresholdLine = document.getElementById('threshold-line'), configPanel = document.getElementById('configPanel'),
+          filePanel = document.getElementById('filePanel'), startBtn = document.getElementById('startBtn');
 
     let audioContext, analyser, dataArray, isRunning = false, scrollPos = 0;
     let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1, mirror: false };
     const aligns = ['left', 'center', 'right'];
 
-    // --- SISTEMA MANTENER PANTALLA ACTIVA (WAKE LOCK) ---
+    // --- WAKE LOCK (PANTALLA ENCENDIDA) ---
     let wakeLock = null;
-
     async function requestWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-                console.log("Pantalla bloqueada (Siempre encendida)");
-            }
-        } catch (err) {
-            console.log("Error con Wake Lock:", err.message);
+        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+    }
+    document.addEventListener('click', () => { if (!wakeLock) requestWakeLock(); }, { once: false });
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
+    });
+
+    // --- CONTROL DE PANELES ---
+    document.getElementById('menuToggle').onclick = () => {
+        filePanel.classList.remove('open');
+        configPanel.classList.toggle('open');
+    };
+    document.getElementById('fileToggle').onclick = () => {
+        configPanel.classList.remove('open');
+        filePanel.classList.toggle('open');
+    };
+
+    // --- SISTEMA DE ARCHIVOS ---
+    function newFile() {
+        if(confirm("¿Crear nuevo archivo? Perderás los cambios no guardados.")) {
+            textElem.innerText = "Escribe tu nuevo guion aquí...";
+            saveData();
+            filePanel.classList.remove('open');
         }
     }
 
-    // Activar al primer toque en la pantalla (requerido por navegadores)
-    document.addEventListener('click', () => {
-        if (!wakeLock) requestWakeLock();
-    }, { once: false });
+    function saveNewNote() {
+        const name = document.getElementById('noteName').value.trim();
+        if (!name) return alert("Escribe un nombre");
+        const library = JSON.parse(localStorage.getItem('tele_library_pro') || '{}');
+        library[name] = textElem.innerText;
+        localStorage.setItem('tele_library_pro', JSON.stringify(library));
+        document.getElementById('noteName').value = '';
+        refreshNotesList();
+    }
 
-    // Re-activar si el usuario sale y vuelve a la app
-    document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') {
-            await requestWakeLock();
+    function refreshNotesList() {
+        const library = JSON.parse(localStorage.getItem('tele_library_pro') || '{}');
+        const list = document.getElementById('notesList');
+        list.innerHTML = '';
+        Object.keys(library).forEach(name => {
+            const div = document.createElement('div');
+            div.className = 'note-item';
+            div.innerHTML = `<span onclick="loadNote('${name}')">📄 ${name}</span>
+                             <button class="btn-del" onclick="deleteNote('${name}')">🗑️</button>`;
+            list.appendChild(div);
+        });
+    }
+
+    function loadNote(name) {
+        const library = JSON.parse(localStorage.getItem('tele_library_pro') || '{}');
+        textElem.innerText = library[name];
+        saveData();
+        filePanel.classList.remove('open');
+    }
+
+    function deleteNote(name) {
+        if(confirm(`¿Borrar "${name}"?`)) {
+            const library = JSON.parse(localStorage.getItem('tele_library_pro') || '{}');
+            delete library[name];
+            localStorage.setItem('tele_library_pro', JSON.stringify(library));
+            refreshNotesList();
         }
-    });
+    }
 
-    // --- FUNCIONES DE GUARDADO ---
+    // --- GUARDADO Y CONFIGURACIÓN ---
     function saveData() {
-        const data = { config: config, text: textElem.innerText };
-        localStorage.setItem('teleprompter_pro_data', JSON.stringify(data));
+        localStorage.setItem('tele_main_save', JSON.stringify({ config: config, text: textElem.innerText }));
     }
 
     function loadData() {
-        const saved = localStorage.getItem('teleprompter_pro_data');
+        const saved = localStorage.getItem('tele_main_save');
         if (saved) {
             const data = JSON.parse(saved);
             config = data.config;
             textElem.innerText = data.text;
-            document.getElementById('speedVal').innerText = config.speed;
-            document.getElementById('sensVal').innerText = config.sens;
-            document.getElementById('fontSizeVal').innerText = config.fontSize;
-            document.getElementById('marginVal').innerText = config.margin;
-            thresholdLine.style.left = config.sens + "%";
-            textElem.style.fontSize = config.fontSize + "px";
-            marginBox.style.width = config.margin + "%";
-            textElem.style.textAlign = aligns[config.alignIdx];
-            if(config.mirror) marginBox.classList.add('mirror-active');
+            applyConfig();
         }
+        refreshNotesList();
+    }
+
+    function applyConfig() {
+        document.getElementById('speedVal').innerText = config.speed;
+        document.getElementById('sensVal').innerText = config.sens;
+        document.getElementById('fontSizeVal').innerText = config.fontSize;
+        document.getElementById('marginVal').innerText = config.margin;
+        thresholdLine.style.left = config.sens + "%";
+        textElem.style.fontSize = config.fontSize + "px";
+        marginBox.style.width = config.margin + "%";
+        textElem.style.textAlign = aligns[config.alignIdx];
+        if(config.mirror) marginBox.classList.add('mirror-active');
+        else marginBox.classList.remove('mirror-active');
     }
 
     textElem.addEventListener('input', saveData);
-    menuToggle.onclick = () => sidePanel.classList.toggle('open');
 
     function changeVal(type, delta) {
         if(type === 'fontSize') config[type] = Math.max(10, Math.min(120, config[type] + delta));
         else if(type === 'margin') config[type] = Math.max(20, Math.min(100, config[type] + delta));
         else config[type] = Math.max(1, Math.min(100, config[type] + delta));
-        document.getElementById(type + 'Val').innerText = config[type];
-        if(type === 'sens') thresholdLine.style.left = config.sens + "%";
-        if(type === 'fontSize') textElem.style.fontSize = config.fontSize + "px";
-        if(type === 'margin') marginBox.style.width = config.margin + "%";
+        applyConfig();
         saveData();
     }
 
-    document.getElementById('alignBtn').onclick = () => {
-        config.alignIdx = (config.alignIdx + 1) % 3;
-        textElem.style.textAlign = aligns[config.alignIdx];
-        saveData();
-    };
-
-    document.getElementById('mirrorBtn').onclick = () => {
-        config.mirror = !config.mirror;
-        marginBox.classList.toggle('mirror-active');
-        saveData();
-    };
+    document.getElementById('alignBtn').onclick = () => { config.alignIdx = (config.alignIdx + 1) % 3; applyConfig(); saveData(); };
+    document.getElementById('mirrorBtn').onclick = () => { config.mirror = !config.mirror; applyConfig(); saveData(); };
+    document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
 
     function mainLoop() {
         if (isRunning && analyser) {
             analyser.getByteFrequencyData(dataArray);
-            let sum = 0; for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-            let volume = (sum / dataArray.length) * 1.5;
+            let volume = (dataArray.reduce((a,b)=>a+b)/dataArray.length)*1.5;
             audioBar.style.width = Math.min(volume, 100) + "%";
-            if (volume > config.sens) {
-                scrollPos += (config.speed / 15);
-                viewport.scrollTop = Math.floor(scrollPos);
-            }
+            if (volume > config.sens) { scrollPos += (config.speed / 15); viewport.scrollTop = Math.floor(scrollPos); }
         }
         requestAnimationFrame(mainLoop);
     }
@@ -267,8 +310,8 @@ Toca el icono ⚙️ arriba para configurar.</div>
                 startBtn.classList.add('active');
                 startBtn.innerText = "🛑 DETENER SENSOR";
                 textElem.contentEditable = "false";
-                setTimeout(() => sidePanel.classList.remove('open'), 500);
-            } catch (e) { alert("Micro denegado."); }
+                configPanel.classList.remove('open');
+            } catch (e) { alert("Error de micrófono."); }
         } else {
             isRunning = false;
             startBtn.classList.remove('active');
@@ -277,7 +320,6 @@ Toca el icono ⚙️ arriba para configurar.</div>
         }
     };
 
-    document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
     window.onload = loadData;
 </script>
 </body>
