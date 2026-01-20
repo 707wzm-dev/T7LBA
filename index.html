@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="Teleprompter7L.png">
 
     <style>
-        :root { --panel-bg: rgba(20, 20, 20, 0.75); --accent: #0f0; }
+        :root { --panel-bg: rgba(20, 20, 20, 0.85); --accent: #0f0; }
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
         
         #viewport { height: 100vh; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
@@ -28,7 +28,6 @@
         #threshold-line { position: absolute; top: 0; height: 100%; width: 2px; background: red; z-index: 2001; }
         #guide { position: fixed; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.25); pointer-events: none; }
 
-        /* Botones Flotantes */
         .float-btn {
             position: fixed; top: 20px; width: 50px; height: 50px;
             background: rgba(50, 50, 50, 0.7); border-radius: 50%; display: flex; align-items: center;
@@ -43,12 +42,24 @@
             max-height: 80vh; background: var(--panel-bg); z-index: 2500;
             border-top: 1px solid #444; border-radius: 25px 25px 0 0;
             transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            padding: 20px; box-sizing: border-box; overflow-y: auto; backdrop-filter: blur(15px);
+            padding: 25px; box-sizing: border-box; overflow-y: auto; backdrop-filter: blur(15px);
         }
         .side-panel.open { transform: translateY(0); }
 
-        .section-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; text-align: center; display: block; margin-bottom: 15px; }
+        .section-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; text-align: center; display: block; margin-bottom: 20px; }
 
+        /* Estilos del Menú de Archivos */
+        .file-group { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; border-radius: 15px; margin-bottom: 15px; }
+        .file-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 10px; }
+        
+        #noteName { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 10px; outline: none; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; }
+        
+        button.action-btn { width: 100%; height: 50px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 14px; margin-bottom: 5px; color: white; }
+        .save-btn { background: #1b5e20; }
+        .open-btn { background: #333; border: 1px solid #555; }
+        .clear-btn { background: #b71c1c; margin-top: 10px; }
+
+        /* Ajustes Configuración */
         .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
         .step-control {
             display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -56,19 +67,13 @@
         }
         .step-label { font-size: 10px; color: #888; text-transform: uppercase; }
         .val-display { font-size: 20px; font-weight: bold; color: var(--accent); min-width: 35px; text-align: center; font-family: monospace; }
-        
         button.ctrl-btn { background: #333; color: white; border: none; width: 42px; height: 42px; border-radius: 12px; font-size: 20px; cursor: pointer; }
         
         #startBtn { width: 100%; height: 55px; background: #222; color: white; border: 1px solid #444; border-radius: 15px; font-weight: bold; font-size: 16px; margin-bottom: 10px; }
         #startBtn.active { background: #d32f2f; border-color: #ff5555; }
         
         .footer-row { display: flex; gap: 10px; margin-top: 12px; }
-        .footer-row button { flex: 1; height: 50px; font-size: 14px; background: #222; border: 1px solid #333; color: white; border-radius: 12px; font-weight: bold;}
-        
-        .file-input-box {
-            background: #111; border: 1px solid #333; padding: 15px; border-radius: 15px; margin-bottom: 15px;
-        }
-        #noteName { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 10px; outline: none; box-sizing: border-box; margin-bottom: 10px;}
+        .footer-row button { flex: 1; height: 45px; background: #222; border: 1px solid #333; color: white; border-radius: 12px; }
     </style>
 </head>
 <body>
@@ -87,18 +92,21 @@ Sube un archivo .txt o escribe tu guion aquí.</div>
 </div>
 
 <div id="filePanel" class="side-panel">
-    <span class="section-label">Gestión de Archivos .txt</span>
+    <span class="section-label">Gestor de Documentos</span>
     
-    <div class="file-input-box">
-        <input id="noteName" type="text" placeholder="Nombre para el archivo...">
-        <button id="startBtn" onclick="exportTxt()" style="background: #004400; margin:0;">📥 GUARDAR EN DISPOSITIVO (.txt)</button>
-    </div>
-
-    <div class="footer-row">
-        <button onclick="document.getElementById('importInput').click()">📤 ABRIR ARCHIVO (.txt)</button>
-        <button onclick="newFile()" style="background: #333;">📄 LIMPIAR PANTALLA</button>
+    <div class="file-group">
+        <label>IMPORTAR</label>
+        <button class="action-btn open-btn" onclick="document.getElementById('importInput').click()">📂 ABRIR ARCHIVO (.txt)</button>
         <input type="file" id="importInput" style="display:none" accept=".txt" onchange="importTxt(this)">
     </div>
+
+    <div class="file-group">
+        <label>EXPORTAR</label>
+        <input id="noteName" type="text" placeholder="Nombre del nuevo archivo...">
+        <button class="action-btn save-btn" onclick="exportTxt()">📥 GUARDAR COMO .TXT</button>
+    </div>
+
+    <button class="action-btn clear-btn" onclick="newFile()">🗑️ LIMPIAR TEXTO</button>
 </div>
 
 <div id="configPanel" class="side-panel">
@@ -157,13 +165,17 @@ Sube un archivo .txt o escribe tu guion aquí.</div>
     let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1, mirror: false };
     const aligns = ['left', 'center', 'right'];
 
-    // --- TOGGLES ---
     document.getElementById('menuToggle').onclick = () => { filePanel.classList.remove('open'); configPanel.classList.toggle('open'); };
     document.getElementById('fileToggle').onclick = () => { configPanel.classList.remove('open'); filePanel.classList.toggle('open'); };
 
-    function newFile() { textElem.innerText = "Escribe o sube un archivo..."; filePanel.classList.remove('open'); }
+    function newFile() { 
+        if(confirm("¿Limpiar el texto actual?")) {
+            textElem.innerText = "Escribe o sube un archivo..."; 
+            filePanel.classList.remove('open'); 
+        }
+    }
 
-    // --- FUNCIONES TXT PURO ---
+    // --- FUNCIONES TXT ---
     function exportTxt() {
         const text = textElem.innerText;
         const name = document.getElementById('noteName').value.trim() || "mi_guion";
@@ -174,6 +186,7 @@ Sube un archivo .txt o escribe tu guion aquí.</div>
         a.download = `${name}.txt`;
         a.click();
         URL.revokeObjectURL(url);
+        filePanel.classList.remove('open');
     }
 
     function importTxt(input) {
@@ -183,13 +196,13 @@ Sube un archivo .txt o escribe tu guion aquí.</div>
         reader.onload = (e) => {
             textElem.innerText = e.target.result;
             filePanel.classList.remove('open');
-            alert("Archivo .txt cargado");
+            alert("¡Archivo cargado con éxito!");
         };
         reader.readAsText(file);
         input.value = '';
     }
 
-    // --- CONFIGURACIÓN ---
+    // --- LÓGICA DE CONFIGURACIÓN ---
     function saveConfig() { localStorage.setItem('tele_settings_only', JSON.stringify(config)); }
 
     function loadData() {
