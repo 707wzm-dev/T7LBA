@@ -47,7 +47,7 @@
         #menuToggle { right: 20px; }
         #fileToggle { left: 20px; }
 
-        /* Paneles con el mismo estilo */
+        /* Paneles */
         .side-panel {
             position: fixed; bottom: 0; left: 0; width: 100%; height: auto;
             max-height: 80vh; background: var(--panel-bg); z-index: 2500;
@@ -98,7 +98,8 @@
 
 <div id="viewport">
     <div id="margin-box">
-        <div id="text" contenteditable="true" spellcheck="false">¡Nuevo Guion! Escribe aquí...</div>
+        <div id="text" contenteditable="true" spellcheck="false">¡Bienvenido!
+Escribe o carga un guion para comenzar.</div>
     </div>
 </div>
 
@@ -172,15 +173,12 @@
     let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1, mirror: false };
     const aligns = ['left', 'center', 'right'];
 
-    // --- WAKE LOCK (PANTALLA ENCENDIDA) ---
+    // --- WAKE LOCK ---
     let wakeLock = null;
     async function requestWakeLock() {
         try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
     }
     document.addEventListener('click', () => { if (!wakeLock) requestWakeLock(); }, { once: false });
-    document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
-    });
 
     // --- CONTROL DE PANELES ---
     document.getElementById('menuToggle').onclick = () => {
@@ -194,11 +192,8 @@
 
     // --- SISTEMA DE ARCHIVOS ---
     function newFile() {
-        if(confirm("¿Crear nuevo archivo? Perderás los cambios no guardados.")) {
-            textElem.innerText = "Escribe tu nuevo guion aquí...";
-            saveData();
-            filePanel.classList.remove('open');
-        }
+        textElem.innerText = "¡Listo! Escribe tu guion aquí...";
+        filePanel.classList.remove('open');
     }
 
     function saveNewNote() {
@@ -227,7 +222,6 @@
     function loadNote(name) {
         const library = JSON.parse(localStorage.getItem('tele_library_pro') || '{}');
         textElem.innerText = library[name];
-        saveData();
         filePanel.classList.remove('open');
     }
 
@@ -240,17 +234,15 @@
         }
     }
 
-    // --- GUARDADO Y CONFIGURACIÓN ---
-    function saveData() {
-        localStorage.setItem('tele_main_save', JSON.stringify({ config: config, text: textElem.innerText }));
+    // --- CONFIGURACIÓN (Solo guarda ajustes, no el texto temporal) ---
+    function saveConfig() {
+        localStorage.setItem('tele_settings_only', JSON.stringify(config));
     }
 
     function loadData() {
-        const saved = localStorage.getItem('tele_main_save');
-        if (saved) {
-            const data = JSON.parse(saved);
-            config = data.config;
-            textElem.innerText = data.text;
+        const savedSettings = localStorage.getItem('tele_settings_only');
+        if (savedSettings) {
+            config = JSON.parse(savedSettings);
             applyConfig();
         }
         refreshNotesList();
@@ -269,18 +261,16 @@
         else marginBox.classList.remove('mirror-active');
     }
 
-    textElem.addEventListener('input', saveData);
-
     function changeVal(type, delta) {
         if(type === 'fontSize') config[type] = Math.max(10, Math.min(120, config[type] + delta));
         else if(type === 'margin') config[type] = Math.max(20, Math.min(100, config[type] + delta));
         else config[type] = Math.max(1, Math.min(100, config[type] + delta));
         applyConfig();
-        saveData();
+        saveConfig(); // Guarda la nueva configuración
     }
 
-    document.getElementById('alignBtn').onclick = () => { config.alignIdx = (config.alignIdx + 1) % 3; applyConfig(); saveData(); };
-    document.getElementById('mirrorBtn').onclick = () => { config.mirror = !config.mirror; applyConfig(); saveData(); };
+    document.getElementById('alignBtn').onclick = () => { config.alignIdx = (config.alignIdx + 1) % 3; applyConfig(); saveConfig(); };
+    document.getElementById('mirrorBtn').onclick = () => { config.mirror = !config.mirror; applyConfig(); saveConfig(); };
     document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
 
     function mainLoop() {
@@ -311,7 +301,7 @@
                 startBtn.innerText = "🛑 DETENER SENSOR";
                 textElem.contentEditable = "false";
                 configPanel.classList.remove('open');
-            } catch (e) { alert("Error de micrófono."); }
+            } catch (e) { alert("Error micro."); }
         } else {
             isRunning = false;
             startBtn.classList.remove('active');
