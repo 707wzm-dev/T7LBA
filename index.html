@@ -15,18 +15,68 @@
         :root { --panel-bg: rgba(20, 20, 20, 0.85); --accent: #0f0; }
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
 
-        #viewport { height: 100vh; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+        /* Contenedor de la cámara */
+        #cam-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        #cameraPreview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Efecto espejo por defecto para la cámara frontal */
+        }
+
+        /* Capa con gradiente para facilitar la lectura sobre el video */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        #viewport { 
+            position: relative;
+            z-index: 10;
+            height: 100vh; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+        }
         #viewport::-webkit-scrollbar { display: none; }
 
         #margin-box { width: 85%; padding-top: 45vh; padding-bottom: 85vh; transition: all 0.3s ease; }
         .mirror-active { transform: scaleX(-1) !important; }
 
-        #text { width: 100%; font-size: 45px; line-height: 1.6; outline: none; white-space: pre-wrap; text-align: center; }
+        #text { 
+            width: 100%; 
+            font-size: 45px; 
+            line-height: 1.6; 
+            outline: none; 
+            white-space: pre-wrap; 
+            text-align: center;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.8); /* Sombra para resaltar texto sobre la cámara */
+        }
 
         #audio-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #111; z-index: 2000; }
         #audio-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.05s; }
         #threshold-line { position: absolute; top: 0; height: 100%; width: 2px; background: red; z-index: 2001; }
-        #guide { position: fixed; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.25); pointer-events: none; }
+        #guide { position: fixed; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.25); pointer-events: none; z-index: 15; }
 
         .float-btn {
             position: fixed; top: 20px; width: 50px; height: 50px;
@@ -75,6 +125,12 @@
     </style>
 </head>
 <body>
+
+<!-- Fondo con Cámara y Gradiente de lectura -->
+<div id="cam-container">
+    <video id="cameraPreview" autoplay playsinline muted></video>
+</div>
+<div id="overlay"></div>
 
 <div id="audio-container"><div id="audio-bar"></div><div id="threshold-line"></div></div>
 <div id="guide"></div>
@@ -150,6 +206,7 @@ Escribe tu guion aquí.</div>
         <button id="alignBtn">≡</button>
         <button id="mirrorBtn">🪞</button>
         <button id="resetBtn">🔄</button>
+        <button id="camToggleBtn">📷</button>
     </div>
 </div>
 
@@ -157,9 +214,11 @@ Escribe tu guion aquí.</div>
     const viewport = document.getElementById('viewport'), textElem = document.getElementById('text'),
           marginBox = document.getElementById('margin-box'), audioBar = document.getElementById('audio-bar'),
           thresholdLine = document.getElementById('threshold-line'), configPanel = document.getElementById('configPanel'),
-          filePanel = document.getElementById('filePanel'), startBtn = document.getElementById('startBtn');
+          filePanel = document.getElementById('filePanel'), startBtn = document.getElementById('startBtn'),
+          cameraVideo = document.getElementById('cameraPreview'), camToggleBtn = document.getElementById('camToggleBtn');
 
     let audioContext, analyser, dataArray, isRunning = false, scrollPos = 0;
+    let mediaStream = null, isCameraActive = false, currentFacingMode = 'user'; // 'user' = cámara frontal
     let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1, mirror: false };
     const aligns = ['left', 'center', 'right'];
     
@@ -256,6 +315,46 @@ Escribe tu guion aquí.</div>
     document.getElementById('mirrorBtn').onclick = () => { config.mirror = !config.mirror; applyConfig(); saveConfig(); };
     document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
 
+    // --- INTEGRACIÓN DE LA CÁMARA ---
+    async function startCamera() {
+        try {
+            if (mediaStream) {
+                mediaStream.getVideoTracks().forEach(track => track.stop());
+            }
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode }
+            });
+            cameraVideo.srcObject = mediaStream;
+            isCameraActive = true;
+            camToggleBtn.style.background = '#0f0';
+            camToggleBtn.style.color = '#000';
+        } catch (err) {
+            alert("No se pudo acceder a la cámara: " + err.message);
+            isCameraActive = false;
+        }
+    }
+
+    function stopCamera() {
+        if (mediaStream) {
+            mediaStream.getVideoTracks().forEach(track => track.stop());
+            cameraVideo.srcObject = null;
+        }
+        isCameraActive = false;
+        camToggleBtn.style.background = '#222';
+        camToggleBtn.style.color = '#fff';
+    }
+
+    camToggleBtn.onclick = () => {
+        if (!isCameraActive) {
+            startCamera();
+        } else {
+            // Cambiar entre cámara frontal y trasera al volver a presionar
+            currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+            cameraVideo.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+            startCamera();
+        }
+    };
+
     function mainLoop() {
         if (isRunning && analyser) {
             analyser.getByteFrequencyData(dataArray);
@@ -270,6 +369,9 @@ Escribe tu guion aquí.</div>
     startBtn.onclick = async () => {
         if (!isRunning) {
             try {
+                // Si la cámara aún no estaba encendida, la activamos automáticamente al iniciar la lectura
+                if (!isCameraActive) await startCamera();
+
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
@@ -288,7 +390,7 @@ Escribe tu guion aquí.</div>
                 startBtn.innerText = "🛑 DETENER SENSOR";
                 textElem.contentEditable = "false";
                 configPanel.classList.remove('open');
-            } catch (e) { alert("Error micro."); }
+            } catch (e) { alert("Error al acceder al micrófono."); }
         } else {
             // Liberar Wake Lock al detener
             releaseWakeLock();
