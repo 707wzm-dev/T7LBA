@@ -34,10 +34,9 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Efecto espejo por defecto para la cámara frontal */
+            transform: scaleX(-1);
         }
 
-        /* Capa con gradiente para facilitar la lectura sobre el video */
         #overlay {
             position: fixed;
             top: 0;
@@ -70,7 +69,7 @@
             outline: none; 
             white-space: pre-wrap; 
             text-align: center;
-            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.8); /* Sombra para resaltar texto sobre la cámara */
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.8);
         }
 
         #audio-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #111; z-index: 2000; }
@@ -86,6 +85,72 @@
         }
         #menuToggle { right: 20px; }
         #fileToggle { left: 20px; }
+
+        /* Barra flotante de grabación */
+        #rec-control-bar {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: rgba(20, 20, 20, 0.85);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid #444;
+            backdrop-filter: blur(10px);
+            z-index: 2800;
+            align-items: center;
+        }
+        .rec-btn {
+            background: #333; color: white; border: none; padding: 10px 16px;
+            border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 13px;
+        }
+        #recordBtn { background: #d32f2f; }
+        #pauseRecBtn { background: #f57c00; display: none; }
+        #stopRecBtn { background: #388e3c; display: none; }
+        #recTimer { font-family: monospace; font-size: 14px; color: #ff5252; min-width: 45px; display: none; }
+
+        /* Panel de vista previa del video grabado */
+        #previewModal {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.9);
+            z-index: 4000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #recordedVideo {
+            width: 100%;
+            max-width: 500px;
+            max-height: 65vh;
+            border-radius: 15px;
+            border: 1px solid #444;
+            background: #000;
+            margin-bottom: 20px;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+        .modal-buttons button {
+            flex: 1;
+            height: 48px;
+            border-radius: 12px;
+            border: none;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            color: white;
+        }
+        #downloadVideoBtn { background: #2e7d32; }
+        #discardVideoBtn { background: #c62828; }
 
         .side-panel {
             position: fixed; bottom: 0; left: 0; width: 100%; height: auto;
@@ -126,7 +191,7 @@
 </head>
 <body>
 
-<!-- Fondo con Cámara y Gradiente de lectura -->
+<!-- Fondo con Cámara -->
 <div id="cam-container">
     <video id="cameraPreview" autoplay playsinline muted></video>
 </div>
@@ -138,6 +203,24 @@
 <div id="fileToggle" class="float-btn">☰</div>
 <div id="menuToggle" class="float-btn">⚙️</div>
 
+<!-- Barra de control de Grabación inferior flotante -->
+<div id="rec-control-bar">
+    <button id="recordBtn" class="rec-btn">⏺️ Grabar</button>
+    <button id="pauseRecBtn" class="rec-btn">⏸️ Pausar</button>
+    <button id="stopRecBtn" class="rec-btn">⏹️ Stop</button>
+    <span id="recTimer">00:00</span>
+</div>
+
+<!-- Modal para ver / descargar / eliminar el video grabado -->
+<div id="previewModal">
+    <span class="section-label" style="margin-bottom:10px;">Video Grabado</span>
+    <video id="recordedVideo" controls playsinline></video>
+    <div class="modal-buttons">
+        <button id="downloadVideoBtn">💾 Guardar / Descargar</button>
+        <button id="discardVideoBtn">🗑️ Eliminar</button>
+    </div>
+</div>
+
 <div id="viewport">
     <div id="margin-box">
         <div id="text" contenteditable="true" spellcheck="false">¡Bienvenido!
@@ -147,19 +230,16 @@ Escribe tu guion aquí.</div>
 
 <div id="filePanel" class="side-panel">
     <span class="section-label">Gestor de Documentos</span>
-
     <div class="file-group">
         <label>IMPORTAR</label>
         <button class="action-btn open-btn" onclick="document.getElementById('importInput').click()">📂 ABRIR ARCHIVO (.txt)</button>
         <input type="file" id="importInput" style="display:none" accept=".txt" onchange="importTxt(this)">
     </div>
-
     <div class="file-group">
         <label>EXPORTAR</label>
         <input id="noteName" type="text" placeholder="Nombre del nuevo archivo...">
         <button class="action-btn save-btn" onclick="exportTxt()">📥 GUARDAR COMO .TXT</button>
     </div>
-
     <button class="action-btn clear-btn" onclick="newFile()">🗑️ LIMPIAR TEXTO</button>
 </div>
 
@@ -217,35 +297,32 @@ Escribe tu guion aquí.</div>
           filePanel = document.getElementById('filePanel'), startBtn = document.getElementById('startBtn'),
           cameraVideo = document.getElementById('cameraPreview'), camToggleBtn = document.getElementById('camToggleBtn');
 
+    // Botones y elementos de grabación
+    const recordBtn = document.getElementById('recordBtn');
+    const pauseRecBtn = document.getElementById('pauseRecBtn');
+    const stopRecBtn = document.getElementById('stopRecBtn');
+    const recTimer = document.getElementById('recTimer');
+    const previewModal = document.getElementById('previewModal');
+    const recordedVideo = document.getElementById('recordedVideo');
+    const downloadVideoBtn = document.getElementById('downloadVideoBtn');
+    const discardVideoBtn = document.getElementById('discardVideoBtn');
+
     let audioContext, analyser, dataArray, isRunning = false, scrollPos = 0;
-    let mediaStream = null, isCameraActive = false, currentFacingMode = 'user'; // 'user' = cámara frontal
+    let mediaStream = null, isCameraActive = false, currentFacingMode = 'user';
+    let mediaRecorder = null, recordedChunks = [], timerInterval = null, secondsElapsed = 0, recordedBlob = null;
+    
     let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1, mirror: false };
     const aligns = ['left', 'center', 'right'];
     
-    // --- SISTEMA WAKE LOCK (Mantener pantalla encendida) ---
     let wakeLock = null;
-
     async function requestWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-            }
-        } catch (err) {
-            console.error(`${err.name}, ${err.message}`);
-        }
+        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
     }
-
     function releaseWakeLock() {
-        if (wakeLock !== null) {
-            wakeLock.release().then(() => { wakeLock = null; });
-        }
+        if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); }
     }
-
-    // Reactivar si el usuario vuelve a la pestaña
     document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') {
-            await requestWakeLock();
-        }
+        if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
     });
 
     document.getElementById('menuToggle').onclick = () => { filePanel.classList.remove('open'); configPanel.classList.toggle('open'); };
@@ -264,9 +341,7 @@ Escribe tu guion aquí.</div>
         const blob = new Blob([text], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `${name}.txt`;
-        a.click();
+        a.href = url; a.download = `${name}.txt`; a.click();
         URL.revokeObjectURL(url);
         filePanel.classList.remove('open');
     }
@@ -285,7 +360,6 @@ Escribe tu guion aquí.</div>
     }
 
     function saveConfig() { localStorage.setItem('tele_settings_only', JSON.stringify(config)); }
-
     function loadData() {
         const savedSettings = localStorage.getItem('tele_settings_only');
         if (savedSettings) { config = JSON.parse(savedSettings); applyConfig(); }
@@ -315,94 +389,78 @@ Escribe tu guion aquí.</div>
     document.getElementById('mirrorBtn').onclick = () => { config.mirror = !config.mirror; applyConfig(); saveConfig(); };
     document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
 
-    // --- INTEGRACIÓN DE LA CÁMARA ---
+    // --- CÁMARA ---
     async function startCamera() {
         try {
-            if (mediaStream) {
-                mediaStream.getVideoTracks().forEach(track => track.stop());
-            }
+            if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
             mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode }
+                video: { facingMode: currentFacingMode },
+                audio: true
             });
             cameraVideo.srcObject = mediaStream;
             isCameraActive = true;
             camToggleBtn.style.background = '#0f0';
             camToggleBtn.style.color = '#000';
         } catch (err) {
-            alert("No se pudo acceder a la cámara: " + err.message);
+            alert("No se pudo acceder a la cámara o micrófono: " + err.message);
             isCameraActive = false;
         }
-    }
-
-    function stopCamera() {
-        if (mediaStream) {
-            mediaStream.getVideoTracks().forEach(track => track.stop());
-            cameraVideo.srcObject = null;
-        }
-        isCameraActive = false;
-        camToggleBtn.style.background = '#222';
-        camToggleBtn.style.color = '#fff';
     }
 
     camToggleBtn.onclick = () => {
         if (!isCameraActive) {
             startCamera();
         } else {
-            // Cambiar entre cámara frontal y trasera al volver a presionar
             currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
             cameraVideo.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
             startCamera();
         }
     };
 
-    function mainLoop() {
-        if (isRunning && analyser) {
-            analyser.getByteFrequencyData(dataArray);
-            let volume = (dataArray.reduce((a,b)=>a+b)/dataArray.length)*1.5;
-            audioBar.style.width = Math.min(volume, 100) + "%";
-            if (volume > config.sens) { scrollPos += (config.speed / 15); viewport.scrollTop = Math.floor(scrollPos); }
-        }
-        requestAnimationFrame(mainLoop);
-    }
-    mainLoop();
+    // --- LÓGICA DE GRABACIÓN (MediaRecorder) ---
+    recordBtn.onclick = async () => {
+        if (!mediaStream) await startCamera();
+        if (!mediaStream) return;
 
-    startBtn.onclick = async () => {
-        if (!isRunning) {
-            try {
-                // Si la cámara aún no estaba encendida, la activamos automáticamente al iniciar la lectura
-                if (!isCameraActive) await startCamera();
+        recordedChunks = [];
+        try {
+            let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = {}; // Dejar que el navegador elija por defecto
+                }
+            }
 
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                const source = audioContext.createMediaStreamSource(stream);
-                source.connect(analyser);
-                analyser.fftSize = 256;
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-                if (audioContext.state === 'suspended') await audioContext.resume();
-                
-                // Activar Wake Lock al iniciar
-                await requestWakeLock();
+            mediaRecorder = new MediaRecorder(mediaStream, options);
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) recordedChunks.push(event.data);
+            };
 
-                isRunning = true;
-                scrollPos = viewport.scrollTop;
-                startBtn.classList.add('active');
-                startBtn.innerText = "🛑 DETENER SENSOR";
-                textElem.contentEditable = "false";
-                configPanel.classList.remove('open');
-            } catch (e) { alert("Error al acceder al micrófono."); }
-        } else {
-            // Liberar Wake Lock al detener
-            releaseWakeLock();
+            mediaRecorder.onstop = () => {
+                recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                const videoUrl = URL.createObjectURL(recordedBlob);
+                recordedVideo.src = videoUrl;
+                previewModal.style.display = 'flex';
+            };
 
-            isRunning = false;
-            startBtn.classList.remove('active');
-            startBtn.innerText = "🎙️ ACTIVAR SENSOR POR VOZ";
-            textElem.contentEditable = "true";
-        }
-    };
+            mediaRecorder.start(1000); // Recopilar datos cada segundo
+            
+            // UI cambios
+            recordBtn.style.display = 'none';
+            pauseRecBtn.style.display = 'inline-block';
+            pauseRecBtn.innerText = "⏸️ Pausar";
+            stopRecBtn.style.display = 'inline-block';
+            recTimer.style.display = 'inline-block';
+            
+            secondsElapsed = 0;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                updateTimerDisplay();
+            }, 1000);
 
-    window.onload = loadData;
-</script>
-</body>
-</html>
+            await requestWakeLock();
+        } catch (e) {
+            alert
