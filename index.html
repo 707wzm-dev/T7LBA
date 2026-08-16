@@ -191,7 +191,6 @@
 </head>
 <body>
 
-<!-- Fondo con Cámara -->
 <div id="cam-container">
     <video id="cameraPreview" autoplay playsinline muted></video>
 </div>
@@ -203,7 +202,6 @@
 <div id="fileToggle" class="float-btn">☰</div>
 <div id="menuToggle" class="float-btn">⚙️</div>
 
-<!-- Barra de control de Grabación inferior flotante -->
 <div id="rec-control-bar">
     <button id="recordBtn" class="rec-btn">⏺️ Grabar</button>
     <button id="pauseRecBtn" class="rec-btn">⏸️ Pausar</button>
@@ -211,7 +209,6 @@
     <span id="recTimer">00:00</span>
 </div>
 
-<!-- Modal para ver / descargar / eliminar el video grabado -->
 <div id="previewModal">
     <span class="section-label" style="margin-bottom:10px;">Video Grabado</span>
     <video id="recordedVideo" controls playsinline></video>
@@ -297,7 +294,6 @@ Escribe tu guion aquí.</div>
           filePanel = document.getElementById('filePanel'), startBtn = document.getElementById('startBtn'),
           cameraVideo = document.getElementById('cameraPreview'), camToggleBtn = document.getElementById('camToggleBtn');
 
-    // Botones y elementos de grabación
     const recordBtn = document.getElementById('recordBtn');
     const pauseRecBtn = document.getElementById('pauseRecBtn');
     const stopRecBtn = document.getElementById('stopRecBtn');
@@ -310,10 +306,11 @@ Escribe tu guion aquí.</div>
     let audioContext, analyser, dataArray, isRunning = false, scrollPos = 0;
     let mediaStream = null, isCameraActive = false, currentFacingMode = 'user';
     let mediaRecorder = null, recordedChunks = [], timerInterval = null, secondsElapsed = 0, recordedBlob = null;
-    
+    let selectedMimeType = '';
+
     let config = { speed: 25, sens: 15, fontSize: 45, margin: 85, alignIdx: 1, mirror: false };
     const aligns = ['left', 'center', 'right'];
-    
+
     let wakeLock = null;
     async function requestWakeLock() {
         try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
@@ -401,6 +398,11 @@ Escribe tu guion aquí.</div>
             isCameraActive = true;
             camToggleBtn.style.background = '#0f0';
             camToggleBtn.style.color = '#000';
+            
+            // Vincular el audio de la cámara al sensor por voz si ya está activo
+            if(isRunning && audioContext) {
+                initAudioSensor(mediaStream);
+            }
         } catch (err) {
             alert("No se pudo acceder a la cámara o micrófono: " + err.message);
             isCameraActive = false;
@@ -417,20 +419,86 @@ Escribe tu guion aquí.</div>
         }
     };
 
-    // --- LÓGICA DE GRABACIÓN (MediaRecorder) ---
+    // --- SENSOR POR VOZ (SCROLL DÍNAMICO) ---
+    startBtn.onclick = async () => {
+        if (!isRunning) {
+            try {
+                if (!mediaStream) {
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                }
+                initAudioSensor(mediaStream);
+                isRunning = true;
+                startBtn.classList.add('active');
+                startBtn.innerText = "🛑 DETENER SENSOR";
+                scrollLoop();
+            } catch (err) {
+                alert("Permiso de micrófono denegado: " + err.message);
+            }
+        } else {
+            isRunning = false;
+            startBtn.classList.remove('active');
+            startBtn.innerText = "🎙️ ACTIVAR SENSOR POR VOZ";
+        }
+    };
+
+    function initAudioSensor(stream) {
+        if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+    }
+
+    function scrollLoop() {
+        if (!isRunning) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        let average = sum / dataArray.length;
+        let volumePercentage = Math.min(100, (average / 128) * 100);
+
+        audioBar.style.width = volumePercentage + "%";
+
+        if (volumePercentage > config.sens) {
+            scrollPos += (config.speed / 10);
+            viewport.scrollTop = scrollPos;
+        } else {
+            scrollPos = viewport.scrollTop;
+        }
+
+        requestAnimationFrame(scrollLoop);
+    }
+
+    // --- GRABACIÓN Y SOPORTE MULTINAVEGADOR ---
+    function getSupportedMimeType() {
+        const types = [
+            'video/mp4;codecs=avc1,mp4a',
+            'video/mp4',
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus',
+            'video/webm'
+        ];
+        for (let type of types) {
+            if (MediaRecorder.isTypeSupported(type)) return type;
+        }
+        return '';
+    }
+
+    function updateTimerDisplay() {
+        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+        const secs = String(secondsElapsed % 60).padStart(2, '0');
+        recTimer.innerText = `${mins}:${secs}`;
+    }
+
     recordBtn.onclick = async () => {
-        if (!mediaStream) await startCamera();
+        if (!mediaStream || !isCameraActive) await startCamera();
         if (!mediaStream) return;
 
         recordedChunks = [];
         try {
-            let options = { mimeType: 'video/webm;codecs=vp9,opus' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options = { mimeType: 'video/webm' };
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options = {}; // Dejar que el navegador elija por defecto
-                }
-            }
+            selectedMimeType = getSupportedMimeType();
+            const options = selectedMimeType ? { mimeType: selectedMimeType } : {};
 
             mediaRecorder = new MediaRecorder(mediaStream, options);
             
@@ -439,15 +507,13 @@ Escribe tu guion aquí.</div>
             };
 
             mediaRecorder.onstop = () => {
-                recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
-                const videoUrl = URL.createObjectURL(recordedBlob);
-                recordedVideo.src = videoUrl;
+                recordedBlob = new Blob(recordedChunks, { type: selectedMimeType || 'video/mp4' });
+                recordedVideo.src = URL.createObjectURL(recordedBlob);
                 previewModal.style.display = 'flex';
             };
 
-            mediaRecorder.start(1000); // Recopilar datos cada segundo
+            mediaRecorder.start(1000);
             
-            // UI cambios
             recordBtn.style.display = 'none';
             pauseRecBtn.style.display = 'inline-block';
             pauseRecBtn.innerText = "⏸️ Pausar";
@@ -463,4 +529,59 @@ Escribe tu guion aquí.</div>
 
             await requestWakeLock();
         } catch (e) {
-            alert
+            alert("No se pudo iniciar la grabación: " + e.message);
+        }
+    };
+
+    pauseRecBtn.onclick = () => {
+        if (!mediaRecorder) return;
+        if (mediaRecorder.state === "recording") {
+            mediaRecorder.pause();
+            clearInterval(timerInterval);
+            pauseRecBtn.innerText = "▶️ Reanudar";
+        } else if (mediaRecorder.state === "paused") {
+            mediaRecorder.resume();
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                updateTimerDisplay();
+            }, 1000);
+            pauseRecBtn.innerText = "⏸️ Pausar";
+        }
+    };
+
+    stopRecBtn.onclick = () => {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+        }
+        clearInterval(timerInterval);
+        releaseWakeLock();
+
+        recordBtn.style.display = 'inline-block';
+        pauseRecBtn.style.display = 'none';
+        stopRecBtn.style.display = 'none';
+        recTimer.style.display = 'none';
+    };
+
+    // Modal de vista previa
+    downloadVideoBtn.onclick = () => {
+        if (!recordedBlob) return;
+        const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+        const a = document.createElement('a');
+        a.href = recordedVideo.src;
+        a.download = `grabacion_teleprompter.${ext}`;
+        a.click();
+    };
+
+    discardVideoBtn.onclick = () => {
+        if (confirm("¿Seguro que deseas eliminar esta grabación?")) {
+            previewModal.style.display = 'none';
+            recordedVideo.src = '';
+            recordedBlob = null;
+        }
+    };
+
+    // Cargar configuraciones guardadas
+    loadData();
+</script>
+</body>
+</html>
