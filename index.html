@@ -35,6 +35,7 @@
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
+            display: none; /* Se activa mediante script */
         }
 
         #overlay {
@@ -48,6 +49,7 @@
             pointer-events: none;
         }
 
+        /* Viewport con efecto de desenfoque/desvanecimiento inferior */
         #viewport { 
             position: relative;
             z-index: 10;
@@ -55,11 +57,13 @@
             overflow-y: auto; 
             display: flex; 
             flex-direction: column; 
-            align-items: center; 
+            align-items: center;
+            -webkit-mask-image: linear-gradient(to bottom, black 0%, black 25%, rgba(0,0,0,0.2) 40%, transparent 80%);
+            mask-image: linear-gradient(to bottom, black 0%, black 25%, rgba(0,0,0,0.2) 40%, transparent 80%);
         }
         #viewport::-webkit-scrollbar { display: none; }
 
-        #margin-box { width: 85%; padding-top: 45vh; padding-bottom: 85vh; transition: all 0.3s ease; }
+        #margin-box { width: 85%; padding-top: 25vh; padding-bottom: 85vh; transition: all 0.3s ease; }
         .mirror-active { transform: scaleX(-1) !important; }
 
         #text { 
@@ -75,7 +79,9 @@
         #audio-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #111; z-index: 2000; }
         #audio-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.05s; }
         #threshold-line { position: absolute; top: 0; height: 100%; width: 2px; background: red; z-index: 2001; }
-        #guide { position: fixed; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.25); pointer-events: none; z-index: 15; }
+        
+        /* Línea guía subida al 30% superior */
+        #guide { position: fixed; top: 30%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.4); pointer-events: none; z-index: 15; }
 
         .float-btn {
             position: fixed; top: 20px; width: 50px; height: 50px;
@@ -93,20 +99,28 @@
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 12px;
+            gap: 10px;
             background: rgba(20, 20, 20, 0.85);
-            padding: 10px 20px;
+            padding: 10px 18px;
             border-radius: 30px;
             border: 1px solid #444;
             backdrop-filter: blur(10px);
             z-index: 2800;
             align-items: center;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
+
+        /* Ocultar la barra si cualquier panel lateral está abierto */
+        body.panel-open #rec-control-bar {
+            display: none !important;
+        }
+
         .rec-btn {
             background: #333; color: white; border: none; padding: 10px 16px;
             border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 13px;
         }
-        #recordBtn { background: #d32f2f; }
+        #toggleCamBtnBar { background: #0288d1; }
+        #recordBtn { background: #d32f2f; display: none; }
         #pauseRecBtn { background: #f57c00; display: none; }
         #stopRecBtn { background: #388e3c; display: none; }
         #recTimer { font-family: monospace; font-size: 14px; color: #ff5252; min-width: 45px; display: none; }
@@ -154,7 +168,7 @@
 
         .side-panel {
             position: fixed; bottom: 0; left: 0; width: 100%; height: auto;
-            max-height: 80vh; background: var(--panel-bg); z-index: 2500;
+            max-height: 80vh; background: var(--panel-bg); z-index: 3500;
             border-top: 1px solid #444; border-radius: 25px 25px 0 0;
             transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             padding: 25px; box-sizing: border-box; overflow-y: auto; backdrop-filter: blur(15px);
@@ -202,7 +216,9 @@
 <div id="fileToggle" class="float-btn">☰</div>
 <div id="menuToggle" class="float-btn">⚙️</div>
 
+<!-- Barra de control flotante inferior -->
 <div id="rec-control-bar">
+    <button id="toggleCamBtnBar" class="rec-btn">📷 Activar Cámara</button>
     <button id="recordBtn" class="rec-btn">⏺️ Grabar</button>
     <button id="pauseRecBtn" class="rec-btn">⏸️ Pausar</button>
     <button id="stopRecBtn" class="rec-btn">⏹️ Stop</button>
@@ -283,7 +299,7 @@ Escribe tu guion aquí.</div>
         <button id="alignBtn">≡</button>
         <button id="mirrorBtn">🪞</button>
         <button id="resetBtn">🔄</button>
-        <button id="camToggleBtn">📷</button>
+        <button id="camToggleBtn">📷 Switch Cam</button>
     </div>
 </div>
 
@@ -294,6 +310,7 @@ Escribe tu guion aquí.</div>
           filePanel = document.getElementById('filePanel'), startBtn = document.getElementById('startBtn'),
           cameraVideo = document.getElementById('cameraPreview'), camToggleBtn = document.getElementById('camToggleBtn');
 
+    const toggleCamBtnBar = document.getElementById('toggleCamBtnBar');
     const recordBtn = document.getElementById('recordBtn');
     const pauseRecBtn = document.getElementById('pauseRecBtn');
     const stopRecBtn = document.getElementById('stopRecBtn');
@@ -322,13 +339,32 @@ Escribe tu guion aquí.</div>
         if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
     });
 
-    document.getElementById('menuToggle').onclick = () => { filePanel.classList.remove('open'); configPanel.classList.toggle('open'); };
-    document.getElementById('fileToggle').onclick = () => { configPanel.classList.remove('open'); filePanel.classList.toggle('open'); };
+    // Gestión de visibilidad de paneles laterales
+    function checkPanelState() {
+        if (configPanel.classList.contains('open') || filePanel.classList.contains('open')) {
+            document.body.classList.add('panel-open');
+        } else {
+            document.body.classList.remove('panel-open');
+        }
+    }
+
+    document.getElementById('menuToggle').onclick = () => { 
+        filePanel.classList.remove('open'); 
+        configPanel.classList.toggle('open'); 
+        checkPanelState();
+    };
+    
+    document.getElementById('fileToggle').onclick = () => { 
+        configPanel.classList.remove('open'); 
+        filePanel.classList.toggle('open'); 
+        checkPanelState();
+    };
 
     function newFile() { 
         if(confirm("¿Limpiar el texto actual?")) {
             textElem.innerText = "Escribe o sube un archivo..."; 
             filePanel.classList.remove('open'); 
+            checkPanelState();
         }
     }
 
@@ -341,6 +377,7 @@ Escribe tu guion aquí.</div>
         a.href = url; a.download = `${name}.txt`; a.click();
         URL.revokeObjectURL(url);
         filePanel.classList.remove('open');
+        checkPanelState();
     }
 
     function importTxt(input) {
@@ -350,6 +387,7 @@ Escribe tu guion aquí.</div>
         reader.onload = (e) => {
             textElem.innerText = e.target.result;
             filePanel.classList.remove('open');
+            checkPanelState();
             alert("¡Archivo cargado con éxito!");
         };
         reader.readAsText(file);
@@ -386,7 +424,7 @@ Escribe tu guion aquí.</div>
     document.getElementById('mirrorBtn').onclick = () => { config.mirror = !config.mirror; applyConfig(); saveConfig(); };
     document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
 
-    // --- CÁMARA ---
+    // --- CÁMARA Y CONTROLES ---
     async function startCamera() {
         try {
             if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
@@ -395,31 +433,64 @@ Escribe tu guion aquí.</div>
                 audio: true
             });
             cameraVideo.srcObject = mediaStream;
+            cameraVideo.style.display = 'block';
             isCameraActive = true;
-            camToggleBtn.style.background = '#0f0';
-            camToggleBtn.style.color = '#000';
             
-            // Vincular el audio de la cámara al sensor por voz si ya está activo
+            // Actualizar interfaz
+            toggleCamBtnBar.innerText = "📷 Apagar Cámara";
+            toggleCamBtnBar.style.background = "#c62828";
+            recordBtn.style.display = 'inline-block';
+
             if(isRunning && audioContext) {
                 initAudioSensor(mediaStream);
             }
         } catch (err) {
             alert("No se pudo acceder a la cámara o micrófono: " + err.message);
-            isCameraActive = false;
+            stopCamera();
         }
     }
 
-    camToggleBtn.onclick = () => {
+    function stopCamera() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+        }
+        cameraVideo.srcObject = null;
+        cameraVideo.style.display = 'none';
+        isCameraActive = false;
+
+        // Resetear UI de barra flotante
+        toggleCamBtnBar.innerText = "📷 Activar Cámara";
+        toggleCamBtnBar.style.background = "#0288d1";
+        recordBtn.style.display = 'none';
+        pauseRecBtn.style.display = 'none';
+        stopRecBtn.style.display = 'none';
+        recTimer.style.display = 'none';
+        clearInterval(timerInterval);
+    }
+
+    toggleCamBtnBar.onclick = () => {
         if (!isCameraActive) {
             startCamera();
         } else {
+            stopCamera();
+        }
+    };
+
+    camToggleBtn.onclick = () => {
+        if (isCameraActive) {
             currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
             cameraVideo.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+            startCamera();
+        } else {
             startCamera();
         }
     };
 
-    // --- SENSOR POR VOZ (SCROLL DÍNAMICO) ---
+    // --- SENSOR POR VOZ ---
     startBtn.onclick = async () => {
         if (!isRunning) {
             try {
