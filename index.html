@@ -74,20 +74,20 @@
             outline: none; 
             white-space: pre-wrap; 
             text-align: center;
-            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.8);
-        }
-
-        /* Estilos para el cambio de color dinámico de las líneas */
-        .line-node {
-            display: block;
-            color: #ffffff;
-            transition: color 0.2s ease, text-shadow 0.2s ease;
-        }
-
-        /* Estilo aplicado cuando la línea pasa por encima de la guía */
-        .line-node.passed-guide {
-            color: #FFFF00 !important; /* Amarillo Neón de alto contraste */
-            text-shadow: 0 0 12px rgba(255, 255, 0, 0.8), 2px 2px 8px rgba(0, 0, 0, 0.9) !important;
+            
+            /* EFECTO DE COLOR EXACTO EN LA LÍNEA GUÍA */
+            background: linear-gradient(
+                to bottom, 
+                #FFFF00 0%, 
+                #FFFF00 20vh, /* Amarillo neón hasta exactamente el 20% de la pantalla (Línea Guía) */
+                #FFFFFF 20vh, 
+                #FFFFFF 100%  /* Blanco de la barra hacia abajo */
+            );
+            background-attachment: fixed; /* Mantiene la división fija en la pantalla sin importar el scroll */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.9));
         }
 
         #audio-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #111; z-index: 2000; }
