@@ -77,11 +77,24 @@
             text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.8);
         }
 
+        /* Estilos para el cambio de color dinámico de las líneas */
+        .line-node {
+            display: block;
+            color: #ffffff;
+            transition: color 0.2s ease, text-shadow 0.2s ease;
+        }
+
+        /* Estilo aplicado cuando la línea pasa por encima de la guía */
+        .line-node.passed-guide {
+            color: #FFFF00 !important; /* Amarillo Neón de alto contraste */
+            text-shadow: 0 0 12px rgba(255, 255, 0, 0.8), 2px 2px 8px rgba(0, 0, 0, 0.9) !important;
+        }
+
         #audio-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #111; z-index: 2000; }
         #audio-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.05s; }
         #threshold-line { position: absolute; top: 0; height: 100%; width: 2px; background: red; z-index: 2001; }
         
-        /* Línea guía subida al 30% superior */
+        /* Línea guía al 20% superior */
         #guide { position: fixed; top: 20%; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.4); pointer-events: none; z-index: 15; }
 
         .float-btn {
@@ -340,6 +353,40 @@ Escribe tu guion aquí.</div>
         if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
     });
 
+    // --- PROCESAMIENTO Y CAMBIO DE COLOR DE LÍNEAS POR ENCIMA DE LA GUÍA ---
+    function formatLines() {
+        const rawLines = textElem.innerText.split('\n');
+        textElem.innerHTML = rawLines.map(line => `<span class="line-node">${line || '&nbsp;'}</span>`).join('');
+    }
+
+    function checkLinesPosition() {
+        const guideY = window.innerHeight * 0.20; // 20% coincidente con top: 20% del CSS
+        const lines = textElem.querySelectorAll('.line-node');
+
+        lines.forEach(line => {
+            const rect = line.getBoundingClientRect();
+            // Si la parte inferior de la línea sobrepasa la guía (está por encima)
+            if (rect.bottom <= guideY + (rect.height * 0.5)) {
+                line.classList.add('passed-guide');
+            } else {
+                line.classList.remove('passed-guide');
+            }
+        });
+    }
+
+    // Monitorear cambios manuales en el texto para no perder la estructura de span
+    let isFormatting = false;
+    textElem.addEventListener('input', () => {
+        if (isFormatting) return;
+        isFormatting = true;
+        const selection = window.getSelection();
+        formatLines();
+        isFormatting = false;
+    });
+
+    // Evento al desplazarse manualmente el scroll
+    viewport.addEventListener('scroll', checkLinesPosition);
+
     // Gestión de visibilidad de paneles laterales
     function checkPanelState() {
         if (configPanel.classList.contains('open') || filePanel.classList.contains('open')) {
@@ -364,6 +411,7 @@ Escribe tu guion aquí.</div>
     function newFile() { 
         if(confirm("¿Limpiar el texto actual?")) {
             textElem.innerText = "Escribe o sube un archivo..."; 
+            formatLines();
             filePanel.classList.remove('open'); 
             checkPanelState();
         }
@@ -387,6 +435,8 @@ Escribe tu guion aquí.</div>
         const reader = new FileReader();
         reader.onload = (e) => {
             textElem.innerText = e.target.result;
+            formatLines();
+            checkLinesPosition();
             filePanel.classList.remove('open');
             checkPanelState();
             alert("¡Archivo cargado con éxito!");
@@ -412,6 +462,7 @@ Escribe tu guion aquí.</div>
         textElem.style.textAlign = aligns[config.alignIdx];
         if(config.mirror) marginBox.classList.add('mirror-active');
         else marginBox.classList.remove('mirror-active');
+        checkLinesPosition();
     }
 
     function changeVal(type, delta) {
@@ -423,7 +474,7 @@ Escribe tu guion aquí.</div>
 
     document.getElementById('alignBtn').onclick = () => { config.alignIdx = (config.alignIdx + 1) % 3; applyConfig(); saveConfig(); };
     document.getElementById('mirrorBtn').onclick = () => { config.mirror = !config.mirror; applyConfig(); saveConfig(); };
-    document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; };
+    document.getElementById('resetBtn').onclick = () => { scrollPos = 0; viewport.scrollTop = 0; checkLinesPosition(); };
 
     // --- CÁMARA Y CONTROLES ---
     async function startCamera() {
@@ -539,6 +590,7 @@ Escribe tu guion aquí.</div>
             scrollPos = viewport.scrollTop;
         }
 
+        checkLinesPosition(); // Evalúa la posición del texto a medida que hace scroll
         requestAnimationFrame(scrollLoop);
     }
 
@@ -652,7 +704,8 @@ Escribe tu guion aquí.</div>
         }
     };
 
-    // Cargar configuraciones guardadas
+    // Inicializar formato y carga de datos guardados
+    formatLines();
     loadData();
 </script>
 </body>
